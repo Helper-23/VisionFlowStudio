@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hdevelop file_version="1.2" halcon_version="18.11.0.1">
+<procedure name="VisionFlowSmoke">
+<interface>
+
+
+<io><par name="InputImage" base_type="iconic" dimension="0" /></io><oc><par name="IsOK" base_type="ctrl" dimension="0" /><par name="Decode_str" base_type="ctrl" dimension="0" /></oc></interface>
+<body>
+
+
+<c></c>
+
+
+
+
+
+
+
+
+<l>create_data_code_2d_model ('Data Matrix ECC 200', [], [], DataCodeHandle)</l><l>find_data_code_2d (InputImage, SymbolXLDs, DataCodeHandle, [], [], ResultHandles, DecodedDataStrings)</l><l>if (|DecodedDataStrings|==1)</l><l>   IsOK:=true</l><l>   Decode_str := DecodedDataStrings</l><l>else</l><l>   IsOK:=false</l><l>   Decode_str:= ''</l><l>endif</l><l>return ()</l></body>
+<docu id="VisionFlowSmoke">
+<parameters>
+
+
+
+<parameter id="InputImage" /><parameter id="IsOK" /><parameter id="Decode_str">
+<default_type>string</default_type>
+<sem_type>string</sem_type>
+<type_list>
+<item>string</item>
+</type_list>
+</parameter></parameters>
+</docu>
+</procedure>
+</hdevelop>

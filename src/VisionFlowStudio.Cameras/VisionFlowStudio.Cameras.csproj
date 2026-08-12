@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><TargetFramework>net48</TargetFramework><LangVersion>7.3</LangVersion><PlatformTarget>x64</PlatformTarget><Prefer32Bit>false</Prefer32Bit></PropertyGroup>
+ <ItemGroup><ProjectReference Include="..\VisionFlowStudio.Core\VisionFlowStudio.Core.csproj"/></ItemGroup>
+ <ItemGroup>
+  <Reference Include="Basler.Pylon"><HintPath>C:\Program Files\Basler\pylon 6\Development\Assemblies\Basler.Pylon\x64\Basler.Pylon.dll</HintPath><Private>true</Private></Reference>
+  <Reference Include="MvCamCtrl.Net"><HintPath>C:\Program Files (x86)\MVS\Development\DotNet\win64\MvCamCtrl.Net.dll</HintPath><Private>true</Private></Reference>
+  <Reference Include="MVSDK_Net"><HintPath>D:\Program Files\MV Viewer\Development\DOTNET DLL\IMV\DOTNET_4.0\x64\MVSDK_Net.dll</HintPath><Private>true</Private></Reference>
+  <Reference Include="System.Drawing"/>
+ </ItemGroup>
+</Project>

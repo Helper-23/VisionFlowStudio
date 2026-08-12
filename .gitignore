@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+.dotnet-home/
+*.user
+*.suo
+*.log
+RunData/
+license-admin/
+*.vfslic
+ImageTemp/
+MvSDKLog/
+AwakenGPUToolLog.txt
+images_v2.db

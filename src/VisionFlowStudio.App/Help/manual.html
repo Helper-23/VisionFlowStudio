@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>VisionFlow Studio 用户手册</title><link rel="stylesheet" href="style.css"></head>
+<body><header><h1>VisionFlow Studio 用户手册</h1><p>工业视觉流程平台 · 项目、相机、视觉算法、脚本与 PLC 通信一体化</p></header>
+<div class="wrap">
+<nav><b>中文目录：</b>
+<a href="#overview">软件概述</a><a href="#quick-start">快速入门</a><a href="#project">项目结构</a><a href="#flow">流程编辑</a>
+<a href="#camera">工业相机</a><a href="#vision">视觉平台</a><a href="#nodes">节点参考</a><a href="#communication">工业通信</a>
+<a href="#trigger">运行与触发</a><a href="#script">C# 脚本</a><a href="#image">图像显示</a><a href="#settings">系统设置</a>
+<a href="#security">加密与保存</a><a href="#troubleshooting">故障排查</a><a href="#shortcuts">快捷键</a><a href="#english">English Guide</a></nav>
+
+<h2 id="overview">1. 软件概述</h2>
+<p>VisionFlow Studio 是面向工业检测项目的 Windows 桌面软件。它将多工站、多产品型号和多流程组织在同一个加密项目中，并统一管理相机采图、VisionMaster、VisionPro、HALCON、C# 高级脚本及 PLC/工业协议通信。</p>
+<p>典型执行链为：<b>触发 → 相机采图 → 视觉流程 → 结果判定 → 通信写入 → 日志与图像显示</b>。流程采用顺序节点模型，每个节点可以启用、禁用、单独运行、从当前节点运行，并配置超时及错误策略。</p>
+<div class="note"><b>支持环境：</b>.NET Framework 4.8 x64；VisionMaster 4.4、VisionPro 7.3、HALCON 18.11；Basler、海康机器人/Hikrobot、Dahua 工业相机；Siemens S7Net、Mitsubishi MC ASCII、Modbus TCP/RTU、Omron FINS TCP、Allen-Bradley EtherNet/IP。</div>
+
+<h2 id="quick-start">2. 快速入门</h2>
+<ol class="steps"><li>通过“文件 → 新建项目”创建项目，进入“项目 → 型号 / 工位 / 相机 / 通信配置”建立实际生产结构。</li>
+<li>在工站下选择型号并新建一个或多个流程。双击项目树中的流程即可切换当前编辑对象。</li>
+<li>使用工具栏“选择节点”添加相机采图、视觉平台、判定、脚本或通信节点，并按生产顺序排列。</li>
+<li>在右侧属性区配置节点参数。数据源、视觉输出和通信通道尽量使用下拉列表选择，避免手工拼写错误。</li>
+<li>先用“单步”验证每个节点，再执行“单次运行”。确认稳定后再启用连续运行或 PLC 通讯触发。</li>
+<li>通过“文件 → 保存项目”设置至少 6 位方案密码。项目以加密 <code>.vfsproj</code> 文件保存。</li></ol>
+<div class="tip"><b>调试建议：</b>先离线图像验证算法，再连接相机验证曝光与触发，最后连接 PLC。这样可以快速定位问题属于图像、算法还是通信层。</div>
+
+<h2 id="project">3. 项目、工站、型号与流程</h2>
+<p>最新项目结构以工站为生产设备实体，以型号为产品配方，二者形成工站-型号关联，每个关联可以拥有多个流程。</p>
+<table><tr><th>对象</th><th>用途</th><th>建议命名</th></tr><tr><td>项目</td><td>一台设备或一条产线的完整配置</td><td>客户_设备_版本</td></tr>
+<tr><td>工站</td><td>独立相机/执行机构/节拍单元</td><td>Station_01、上料检测</td></tr><tr><td>型号</td><td>产品配方，可在多个工站复用</td><td>Model_A、产品料号</td></tr>
+<tr><td>流程</td><td>一个可独立运行和显示的检测序列</td><td>MainFlow、OCR_Check</td></tr></table>
+<p>流程树支持右键“保存、重命名、删除”。删除前应确认 PLC 触发配置、通信写入映射和脚本中没有继续引用该流程。每个流程拥有独立图像画面；生产监控页可同时显示多个工站/型号/流程的结果。</p>
+
+<h2 id="flow">4. 流程编辑与节点执行</h2>
+<p>流程表格显示顺序、启用状态、名称、类型、平台、状态、耗时和信息。节点运行结果包含 <code>Idle</code>、<code>Ok</code>、<code>Ng</code>、<code>Error</code>、<code>Skipped</code>。</p>
+<ul><li><b>复制/删除：</b>复制当前节点参数或从流程移除。</li><li><b>上移/下移：</b>改变数据产生和消费顺序。通信节点必须位于其数据源节点之后。</li>
+<li><b>启用/禁用：</b>禁用节点运行时显示 Skipped，不参与判定。</li><li><b>错误策略：</b><code>StopFlow</code> 立即终止；<code>Continue</code> 记录错误后继续。</li>
+<li><b>超时：</b>相机硬触发等待应设置为大于实际触发周期；视觉平台超时应覆盖最坏算法时间。</li></ul>
+
+<h2 id="camera">5. 工业相机管理</h2>
+<p>打开“工具 → 工业相机管理”时软件会自动搜索设备。选择设备后执行连接，并通过实时预览观察曝光、增益、像素格式和帧率的效果。</p>
+<table><tr><th>参数</th><th>说明</th><th>注意事项</th></tr><tr><td>曝光时间</td><td>单位通常为微秒</td><td>应小于工位节拍，运动目标需防拖影</td></tr>
+<tr><td>增益</td><td>提升亮度同时放大噪声</td><td>优先调整光源和曝光</td></tr><tr><td>触发模式</td><td>Off 连续/自由采集；On 等待触发</td><td>硬触发必须同时选择正确 TriggerSource</td></tr>
+<tr><td>触发源</td><td>Software 或 Line0/Line1 等硬件线</td><td>确认电平、边沿和接线</td></tr><tr><td>像素格式</td><td>Mono8、Bayer、RGB 等</td><td>算法输入类型必须匹配</td></tr>
+<tr><td>UserSet</td><td>相机内部参数组</td><td>“应用参数”只修改当前会话；需要掉电保持时再保存到 UserSet</td></tr></table>
+<div class="warning"><b>设备无访问权限：</b>先关闭 MVS/MV Viewer、VisionMaster 和其他占用相机的软件；确认没有残留 VisionFlowStudio 进程；刷新设备后重连。管理员权限通常不是根因，GigE 相机还应检查网卡 IP、子网、巨帧和防火墙。</div>
+
+<h2 id="vision">6. VisionMaster、VisionPro 与 HALCON</h2>
+<h3>VisionMaster</h3><p>节点加载 <code>.sol</code>，选择流程名，并将上游图像写入配置的图像输入。调试窗口可以编辑 Solution/模块参数并保存。通讯下拉输出来自流程公开 Output；新增输出后必须保存 Solution，回到主界面刷新或重新加载节点输出。</p>
+<h3>VisionPro</h3><p>节点加载 <code>.vpp</code> CogToolBlock。输入图像写入指定终端，基础类型输出会暴露给判定、脚本和通信节点。调试窗口承载 ToolBlock 编辑控件，保存后下次运行自动使用更新文件。</p>
+<h3>HALCON</h3><p>节点执行 <code>.hdvp</code> 外部过程。图形输入、图形输出、控制输入和控制输出名称必须与过程接口一致。接口结构调整后保存并重新加载；复杂调试建议在 HDevelop 中完成，平台内编辑器用于接口、调用参数和快速验证。</p>
+
+<h2 id="nodes">7. 常用节点参考</h2>
+<table><tr><th>节点</th><th>输入</th><th>主要输出</th></tr><tr><td>CameraGrabNode</td><td>厂商、设备、曝光、触发等</td><td>图像路径、相机图像及采集状态</td></tr>
+<tr><td>VisionMasterProcedureNode</td><td>上游图像、Solution、流程</td><td>公开流程输出、IsOK、耗时</td></tr><tr><td>VisionProToolBlockNode</td><td>上游图像、VPP、输入名</td><td>ToolBlock 基础类型输出</td></tr>
+<tr><td>HalconProcedureNode</td><td>图像、HDVP、接口参数</td><td>控制输出和处理状态</td></tr><tr><td>LimitJudgeNode</td><td>下拉选择的数据源、Min、Max</td><td>OK/NG 判定</td></tr>
+<tr><td>CSharpScriptNode</td><td>流程上下文、任意节点 I/O</td><td>脚本声明输出</td></tr><tr><td>CommunicationWriteNode</td><td>多个视觉输出映射</td><td>各地址写入结果</td></tr></table>
+
+<h2 id="communication">8. 工业通信与多地址写入</h2>
+<p>先在“工具 → 通信配置”创建通道。窗口打开时会测试通道连接，并在窗口底部显示结果。流程中的通信写入节点通过下拉框选择通道和已暴露的视觉输出，可添加 N 条“数据源 → PLC 地址 → 数据类型”映射。</p>
+<table><tr><th>协议</th><th>地址示例</th><th>要点</th></tr><tr><td>Siemens S7Net</td><td>DB1.0、DB10.4</td><td>型号、Rack、Slot 与 PLC 匹配</td></tr>
+<tr><td>Mitsubishi MC ASCII</td><td>D100、M100</td><td>确认 ASCII 模式和网络号/站号</td></tr><tr><td>Modbus TCP/RTU</td><td>0、100、x=3;100</td><td>功能码、站号、字节序需一致</td></tr>
+<tr><td>Omron FINS TCP</td><td>D100、CIO100</td><td>节点号和地址区正确</td></tr><tr><td>Allen-Bradley EIP</td><td>TagName</td><td>使用 PLC 标签名及匹配数组长度</td></tr></table>
+<p>支持 Bool、Byte、Int16/UInt16、Int32/UInt32、Int64/UInt64、Float、Double、String 及相应数组。字符串和数组要确认 PLC 端缓冲区长度。通信节点中的每条映射独立记录成功或失败信息。</p>
+
+<h2 id="trigger">9. 单次、连续、硬触发与 PLC 触发</h2>
+<ul><li><b>单次运行：</b>完整执行一次当前流程。</li><li><b>连续运行：</b>循环执行流程。相机为硬触发时，CameraGrabNode 每轮等待下一帧硬触发，然后继续执行后续节点。</li>
+<li><b>通讯触发：</b>轮询指定通道和地址，根据数据类型、触发值和边沿启动流程。建议使用上升沿并在流程结束后由 PLC 或软件复位握手位。</li>
+<li><b>单步：</b>仅运行选中节点；要求所需上游数据已经存在。</li><li><b>从当前运行：</b>从选中节点执行至末尾，适合调试流程后半段。</li></ul>
+<div class="warning">硬触发等待时间由相机节点超时控制。若生产节拍可能为 10 秒，相机节点超时不应仍为 1 秒；停止按钮会取消等待并释放循环。</div>
+
+<h2 id="script">10. C# 高级脚本</h2>
+<p>脚本节点提供接近常规 C# 的完整类编辑方式、语法高亮、诊断、自动完成、参数提示、外部 DLL 引用和 using 管理。脚本必须继承 <code>VisionFlowAdvancedScriptBase</code>，常用入口为 <code>Initialize()</code> 和 <code>Run()</code>。</p>
+<pre><code>public override void Run()
+{
+    var code = Get&lt;string&gt;("VisionMaster 流程.CodeStr");
+    SetOutput("Code", code);
+    SetOutput("IsOK", !string.IsNullOrWhiteSpace(code));
+}</code></pre>
+<p><code>Get&lt;T&gt;("Key")</code> 读取流程数据；<code>GetNodeOutput&lt;T&gt;</code> 和 <code>GetNodeInput&lt;T&gt;</code> 按节点读取；<code>SetOutput</code> 发布脚本输出；<code>CancellationToken</code> 用于响应停止。添加外部 DLL 后还要添加对应 namespace。DLL 位数和目标 Framework 必须兼容当前 x64/.NET Framework 4.8 进程。</p>
+
+<h2 id="image">11. 图像与结果</h2>
+<p>每个流程对应一个独立图像文档。多画面监控适合生产同时查看多个工站；单画面查看用于调试；双击卡片或点击“弹出选中画面”可打开独立窗口。</p>
+<ul><li>滚轮：以鼠标位置缩放。</li><li>按住左键拖动：平移图像。</li><li>双击/“适应”：自动适配窗口。</li><li>“1:1”：按原始像素显示。</li><li>鼠标移动：显示 X、Y 和灰度/颜色值。</li></ul>
+
+<h2 id="settings">12. 系统设置</h2>
+<ul><li><b>开机软件自启动：</b>写入当前用户启动项，不需要管理员权限。</li><li><b>启动时最大化：</b>主窗口显示后最大化。</li>
+<li><b>自动加载指定方案：</b>保存加密项目路径和受 Windows 当前用户保护的密码。</li><li><b>界面语言：</b>简体中文和 English，可即时切换并在下次启动保持。</li>
+<li><b>自动保存：</b>手动开启，设置 1～1440 分钟。只有已经保存且密码可用的加密项目会被自动保存，流程运行中自动顺延。</li></ul>
+
+<h2 id="security">13. 加密、保存和备份</h2>
+<p><code>.vfsproj</code> 是当前项目的唯一正式持久化格式，包含项目结构、工站、型号、多个流程、节点参数、相机与通信配置。文件使用基于密码的认证加密，错误密码或文件被篡改都会拒绝加载。</p>
+<div class="warning">项目密码无法由软件找回。请在受控的密码管理系统中保存，并对项目文件、SOL/VPP/HDVP、脚本 DLL 和相机 UserSet 做版本化备份。</div>
+<p>“保存项目”覆盖当前项目文件；“另存为项目”创建新文件并可设置新密码。流程菜单中的独立流程文件只用于流程交换或调试，不代替完整项目备份。</p>
+
+<h2 id="troubleshooting">14. 故障排查</h2>
+<table><tr><th>现象</th><th>检查顺序</th></tr><tr><td>软件启动失败</td><td>确认 x64、.NET 4.8、各视觉 SDK 路径；查看运行日志；暂时取消自动加载项目。</td></tr>
+<tr><td>SOL 加载 NullReference</td><td>确认 VM 版本与引用一致、Solution 可由官方 VM 打开、流程名存在；关闭占用后重新加载。</td></tr><tr><td>视觉工具报红/没有图像</td><td>确认相机节点在前、图像源 Key 正确、平台输入名匹配、像素格式兼容；先单步运行相机节点。</td></tr>
+<tr><td>通信数据不存在</td><td>数据源节点必须先运行；重新发现视觉输出；确认下拉选择的 Key 未因节点重命名失效。</td></tr><tr><td>PLC 连接超时</td><td>Ping/IP/端口、PLC 访问设置、Rack/Slot/站号、协议模式、防火墙。</td></tr>
+<tr><td>脚本 DLL 无法加载</td><td>检查依赖 DLL、x64、.NET Framework 版本、程序集冲突和 using；在编译诊断区查看完整异常。</td></tr><tr><td>硬触发一直等待</td><td>检查 TriggerMode、TriggerSource、线缆电平/边沿、相机节点超时；用厂商工具先验证触发。</td></tr></table>
+
+<h2 id="shortcuts">15. 快捷键</h2>
+<table><tr><th>快捷键</th><th>功能</th></tr><tr><td><span class="kbd">Ctrl+N</span></td><td>新建项目</td></tr><tr><td><span class="kbd">Ctrl+O</span></td><td>打开项目</td></tr>
+<tr><td><span class="kbd">Ctrl+S</span></td><td>保存项目</td></tr><tr><td><span class="kbd">Ctrl+Shift+N</span></td><td>新建流程</td></tr><tr><td><span class="kbd">Ctrl+Shift+O</span></td><td>打开流程</td></tr><tr><td><span class="kbd">Ctrl+Shift+S</span></td><td>保存流程</td></tr>
+<tr><td><span class="kbd">F5</span></td><td>脚本编辑器运行</td></tr><tr><td><span class="kbd">F6</span></td><td>脚本编译</td></tr><tr><td><span class="kbd">Ctrl+Space</span></td><td>脚本自动完成</td></tr></table>
+
+<div class="en"><h1 id="english">VisionFlow Studio — English Guide</h1>
+<h2>Overview</h2><p>VisionFlow Studio is an x64 industrial vision workflow application for multi-station, multi-recipe and multi-flow projects. It integrates industrial cameras, VisionMaster, VisionPro, HALCON, C# advanced scripting and PLC communications in one encrypted project.</p>
+<h2>Getting Started</h2><ol><li>Create a project and define recipes, stations, cameras and communication channels.</li><li>Create one or more flows for each station/recipe pair.</li><li>Add nodes in execution order: acquisition, vision, judgment, communication and logging.</li><li>Configure node inputs using drop-down lists whenever available.</li><li>Validate nodes with Single Step, then Run Once, Continuous Run or PLC Trigger.</li><li>Save the project as an encrypted <code>.vfsproj</code> and retain the password securely.</li></ol>
+<h2>Camera and Triggering</h2><p>The camera manager searches devices when opened and provides live preview for exposure and gain tuning. Free-run mode continuously supplies frames. With hardware trigger enabled, each continuous-flow iteration waits for the next triggered frame. Set the camera-node timeout above the longest expected trigger interval.</p>
+<h2>Vision Platforms</h2><p>VisionMaster nodes load SOL solutions and expose published flow outputs. VisionPro nodes load VPP ToolBlocks and publish primitive outputs. HALCON nodes execute HDVP external procedures with explicit iconic/control interfaces. Save vendor project changes and refresh output discovery after adding or renaming outputs.</p>
+<h2>PLC Communications</h2><p>Create and test channels before using a Communication Write node. Each node supports multiple mappings from a vision output to a PLC address and data type. Supported protocols include Siemens S7Net, Mitsubishi MC ASCII, Modbus TCP/RTU, Omron FINS TCP and Allen-Bradley EIP.</p>
+<h2>Advanced C# Script</h2><p>Scripts use a full class derived from <code>VisionFlowAdvancedScriptBase</code>. Use <code>Get&lt;T&gt;</code>, <code>GetNodeOutput&lt;T&gt;</code> and <code>SetOutput</code>. External assemblies must target a compatible .NET Framework and x64 process. Use Ctrl+Space for completion, F6 to compile and F5 to run.</p>
+<h2>Saving, Security and Settings</h2><p>Projects are authenticated and encrypted. Passwords configured for automatic loading are protected with the current Windows account. Automatic save is disabled by default, supports a 1–1440 minute interval, and is deferred while a flow is running. Display language can be switched between Simplified Chinese and English immediately.</p>
+<h2>Troubleshooting</h2><p>For camera access errors, close vendor viewers and other owners, refresh and reconnect. For missing data, run the source node first and refresh published outputs. For PLC timeouts, verify address, port, CPU/rack/slot or station number and firewall. For script load failures, verify architecture, framework version and dependent DLLs.</p></div>
+<p class="small">VisionFlow Studio Help · Generated for the current .NET Framework 4.8 x64 project.</p>
+</div></body></html>

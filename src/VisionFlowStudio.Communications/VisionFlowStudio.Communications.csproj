@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><TargetFramework>net48</TargetFramework><LangVersion>7.3</LangVersion><PlatformTarget>x64</PlatformTarget><Prefer32Bit>false</Prefer32Bit></PropertyGroup>
+ <ItemGroup><ProjectReference Include="..\VisionFlowStudio.Core\VisionFlowStudio.Core.csproj"/></ItemGroup>
+ <ItemGroup>
+  <Reference Include="HslCommunication"><HintPath>..\..\lib\HslCommunication.7.0.0\HslCommunication.dll</HintPath><Private>true</Private></Reference>
+  <Reference Include="Microsoft.CSharp"/><Reference Include="System"/>
+ </ItemGroup>
+</Project>

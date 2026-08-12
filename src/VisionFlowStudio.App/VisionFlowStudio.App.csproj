@@ -1,0 +1,68 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>7.3</LangVersion>
+    <Nullable>disable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <AssemblyName>VisionFlowStudio</AssemblyName>
+    <RootNamespace>VisionFlowStudio.App</RootNamespace>
+    <ApplicationIcon>bin\Debug\net48\Application.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
+    <ProjectReference Include="..\VisionFlowStudio.Core\VisionFlowStudio.Core.csproj" />
+    <ProjectReference Include="..\VisionFlowStudio.VisionMaster\VisionFlowStudio.VisionMaster.csproj" />
+    <ProjectReference Include="..\VisionFlowStudio.VisionPro\VisionFlowStudio.VisionPro.csproj" />
+    <ProjectReference Include="..\VisionFlowStudio.Halcon\VisionFlowStudio.Halcon.csproj" />
+    <ProjectReference Include="..\VisionFlowStudio.Cameras\VisionFlowStudio.Cameras.csproj" />
+    <ProjectReference Include="..\VisionFlowStudio.Communications\VisionFlowStudio.Communications.csproj" />
+    <ProjectReference Include="..\VisionFlowStudio.Scripting\VisionFlowStudio.Scripting.csproj" />
+    <ProjectReference Include="..\VisionFlowStudio.Licensing\VisionFlowStudio.Licensing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Cognex.VisionPro"><HintPath>D:\Program Files\Cognex\VisionPro\ReferencedAssemblies\Cognex.VisionPro.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Cognex.VisionPro.Core"><HintPath>D:\Program Files\Cognex\VisionPro\ReferencedAssemblies\Cognex.VisionPro.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Cognex.VisionPro.Controls"><HintPath>D:\Program Files\Cognex\VisionPro\ReferencedAssemblies\Cognex.VisionPro.Controls.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Cognex.VisionPro.ToolGroup"><HintPath>D:\Program Files\Cognex\VisionPro\ReferencedAssemblies\Cognex.VisionPro.ToolGroup.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Cognex.VisionPro.ToolGroup.Controls"><HintPath>D:\Program Files\Cognex\VisionPro\ReferencedAssemblies\Cognex.VisionPro.ToolGroup.Controls.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Apps.BaseLog"><HintPath>C:\Program Files\VisionMaster4.4.0\Development\V4.x\ComControls\Assembly\Apps.BaseLog.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="VM.Core"><HintPath>C:\Program Files\VisionMaster4.4.0\Development\V4.x\ComControls\Assembly\VM.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="VM.PlatformSDKCS"><HintPath>C:\Program Files\VisionMaster4.4.0\Development\V4.x\ComControls\Assembly\VM.PlatformSDKCS.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="VMControls.BaseInterface"><HintPath>C:\Program Files\VisionMaster4.4.0\Development\V4.x\ComControls\Assembly\VMControls.BaseInterface.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="VMControls.Interface"><HintPath>C:\Program Files\VisionMaster4.4.0\Development\V4.x\ComControls\Assembly\VMControls.Interface.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="VMControls.RenderInterface"><HintPath>C:\Program Files\VisionMaster4.4.0\Development\V4.x\ComControls\Assembly\VMControls.RenderInterface.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="VMControls.WPF.Release"><HintPath>C:\Program Files\VisionMaster4.4.0\Development\V4.x\ComControls\Assembly\VMControls.WPF.Release.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\VisionPrograms\*.sol" Link="VisionPrograms\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\VisionPrograms\*.vpp" Link="VisionPrograms\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\VisionPrograms\*.hdvp" Link="VisionPrograms\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="bin\Debug\net48\Application.ico" />
+    <Content Include="Help\VisionFlowStudio.chm" Condition="Exists('Help\VisionFlowStudio.chm')"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="Help\manual.html"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="Help\style.css"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="C:\Program Files\VisionMaster4.4.0\Development\V4.x\ComControls\Assembly\myLibs\Apps.BaseLog.config" Link="myLibs\Apps.BaseLog.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\Roslyn\System.Runtime.CompilerServices.Unsafe.dll" Link="System.Runtime.CompilerServices.Unsafe.dll"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\Roslyn\System.Memory.dll" Link="System.Memory.dll"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\Roslyn\System.Buffers.dll" Link="System.Buffers.dll"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\Roslyn\System.Numerics.Vectors.dll" Link="System.Numerics.Vectors.dll"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+    <Content Include="C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\Roslyn\System.Text.Encoding.CodePages.dll" Link="System.Text.Encoding.CodePages.dll"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+  </ItemGroup>
+</Project>

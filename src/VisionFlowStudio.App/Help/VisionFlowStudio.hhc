@@ -1,0 +1,37 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN"><HTML><BODY><UL>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="VisionFlow Studio"><param name="Local" value="index.html"></OBJECT>
+<UL>
+ <LI><OBJECT type="text/sitemap"><param name="Name" value="手册首页 / Help Home"><param name="Local" value="index.html"></OBJECT>
+ <LI><OBJECT type="text/sitemap"><param name="Name" value="快速入门"><param name="Local" value="manual.html#quick-start"></OBJECT>
+ <UL>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="软件概述"><param name="Local" value="manual.html#overview"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="快速入门"><param name="Local" value="manual.html#quick-start"></OBJECT>
+ </UL>
+ <LI><OBJECT type="text/sitemap"><param name="Name" value="项目与流程"><param name="Local" value="manual.html#project"></OBJECT>
+ <UL>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="项目、工站、型号与流程"><param name="Local" value="manual.html#project"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="流程编辑与节点执行"><param name="Local" value="manual.html#flow"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="常用节点参考"><param name="Local" value="manual.html#nodes"></OBJECT>
+ </UL>
+ <LI><OBJECT type="text/sitemap"><param name="Name" value="图像与视觉"><param name="Local" value="manual.html#camera"></OBJECT>
+ <UL>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="工业相机管理"><param name="Local" value="manual.html#camera"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="VisionMaster / VisionPro / HALCON"><param name="Local" value="manual.html#vision"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="图像与结果显示"><param name="Local" value="manual.html#image"></OBJECT>
+ </UL>
+ <LI><OBJECT type="text/sitemap"><param name="Name" value="自动化与扩展"><param name="Local" value="manual.html#communication"></OBJECT>
+ <UL>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="工业通信与多地址写入"><param name="Local" value="manual.html#communication"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="运行、连续采集与触发"><param name="Local" value="manual.html#trigger"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="C# 高级脚本"><param name="Local" value="manual.html#script"></OBJECT>
+ </UL>
+ <LI><OBJECT type="text/sitemap"><param name="Name" value="管理与参考"><param name="Local" value="manual.html#settings"></OBJECT>
+ <UL>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="系统设置"><param name="Local" value="manual.html#settings"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="加密、保存与备份"><param name="Local" value="manual.html#security"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="故障排查"><param name="Local" value="manual.html#troubleshooting"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Name" value="快捷键"><param name="Local" value="manual.html#shortcuts"></OBJECT>
+ </UL>
+ <LI><OBJECT type="text/sitemap"><param name="Name" value="English Guide"><param name="Local" value="manual.html#english"></OBJECT>
+</UL>
+</UL></BODY></HTML>

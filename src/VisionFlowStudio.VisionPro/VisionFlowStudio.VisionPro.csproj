@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><TargetFramework>net48</TargetFramework><LangVersion>7.3</LangVersion><PlatformTarget>x64</PlatformTarget><Prefer32Bit>false</Prefer32Bit></PropertyGroup>
+ <ItemGroup><ProjectReference Include="..\VisionFlowStudio.Core\VisionFlowStudio.Core.csproj"/></ItemGroup>
+ <ItemGroup>
+  <Reference Include="Cognex.VisionPro"><HintPath>D:\Program Files\Cognex\VisionPro\ReferencedAssemblies\Cognex.VisionPro.dll</HintPath><Private>false</Private></Reference>
+  <Reference Include="Cognex.VisionPro.Core"><HintPath>D:\Program Files\Cognex\VisionPro\ReferencedAssemblies\Cognex.VisionPro.Core.dll</HintPath><Private>false</Private></Reference>
+  <Reference Include="Cognex.VisionPro.CorePlus"><HintPath>D:\Program Files\Cognex\VisionPro\ReferencedAssemblies\Cognex.VisionPro.CorePlus.dll</HintPath><Private>false</Private></Reference>
+  <Reference Include="Cognex.VisionPro.ToolGroup"><HintPath>D:\Program Files\Cognex\VisionPro\ReferencedAssemblies\Cognex.VisionPro.ToolGroup.dll</HintPath><Private>false</Private></Reference>
+  <Reference Include="System.Drawing"/>
+ </ItemGroup>
+</Project>

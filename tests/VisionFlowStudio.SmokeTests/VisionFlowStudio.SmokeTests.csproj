@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\VisionFlowStudio.Core\VisionFlowStudio.Core.csproj" />
+    <ProjectReference Include="..\..\src\VisionFlowStudio.VisionMaster\VisionFlowStudio.VisionMaster.csproj" />
+    <ProjectReference Include="..\..\src\VisionFlowStudio.VisionPro\VisionFlowStudio.VisionPro.csproj" />
+    <ProjectReference Include="..\..\src\VisionFlowStudio.Halcon\VisionFlowStudio.Halcon.csproj" />
+    <ProjectReference Include="..\..\src\VisionFlowStudio.Cameras\VisionFlowStudio.Cameras.csproj" />
+    <ProjectReference Include="..\..\src\VisionFlowStudio.Communications\VisionFlowStudio.Communications.csproj" />
+    <ProjectReference Include="..\..\src\VisionFlowStudio.Scripting\VisionFlowStudio.Scripting.csproj" />
+    <ProjectReference Include="..\..\src\VisionFlowStudio.App\VisionFlowStudio.App.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+    <Content Include="C:\Program Files\VisionMaster4.4.0\Development\V4.x\ComControls\Assembly\myLibs\Apps.BaseLog.config"
+             Link="myLibs\Apps.BaseLog.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

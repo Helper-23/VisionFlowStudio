@@ -1,0 +1,38 @@
+<Window x:Class="VisionFlowStudio.App.ActivationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VisionFlow Studio - 软件激活" Width="760" Height="560"
+        MinWidth="640" MinHeight="480" WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize" Background="#F3F9FF" ShowInTaskbar="True">
+ <Window.Resources>
+  <SolidColorBrush x:Key="Accent" Color="#168DD0"/>
+  <Style TargetType="Button"><Setter Property="Padding" Value="16,8"/><Setter Property="Margin" Value="0,0,8,0"/><Setter Property="MinWidth" Value="100"/></Style>
+  <Style TargetType="TextBox"><Setter Property="Padding" Value="8"/><Setter Property="BorderBrush" Value="#A7CDE8"/><Setter Property="BorderThickness" Value="1"/></Style>
+ </Window.Resources>
+ <Grid Margin="24">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel Grid.Row="0" Margin="0,0,0,18">
+   <TextBlock x:Name="TitleText" Text="软件尚未激活" FontSize="26" FontWeight="SemiBold" Foreground="#0E3655"/>
+   <TextBlock x:Name="DescriptionText" Text="请复制本机机器码并发送给软件供应商，收到许可证后粘贴或导入完成激活。" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#52758F" FontSize="14"/>
+  </StackPanel>
+  <TextBlock x:Name="MachineLabel" Grid.Row="1" Text="本机机器码" FontWeight="SemiBold" Foreground="#244B67"/>
+  <Grid Grid.Row="2" Margin="0,6,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <TextBox x:Name="MachineCodeBox" IsReadOnly="True" FontFamily="Consolas" FontSize="16" VerticalContentAlignment="Center"/>
+   <Button x:Name="CopyButton" Grid.Column="1" Content="复制机器码" Click="CopyMachineCode_Click" Margin="8,0,0,0"/>
+  </Grid>
+  <Grid Grid.Row="3"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <TextBlock x:Name="LicenseLabel" Text="许可证密钥" FontWeight="SemiBold" Foreground="#244B67"/>
+   <TextBox x:Name="LicenseKeyBox" Grid.Row="1" Margin="0,6,0,0" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13"/>
+  </Grid>
+  <Border Grid.Row="4" Margin="0,14,0,14" Padding="10" CornerRadius="4" Background="#E6F4FD" BorderBrush="#B5DBF3" BorderThickness="1">
+   <TextBlock x:Name="StatusText" TextWrapping="Wrap" Foreground="#175D87"/>
+  </Border>
+  <Grid Grid.Row="5"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <Button x:Name="ImportButton" Content="导入许可证文件..." Click="Import_Click" HorizontalAlignment="Left"/>
+   <StackPanel Grid.Column="1" Orientation="Horizontal">
+    <Button x:Name="ExitButton" Content="退出" Click="Exit_Click"/>
+    <Button x:Name="ActivateButton" Content="激活" Click="Activate_Click" Background="{StaticResource Accent}" Foreground="White" BorderBrush="{StaticResource Accent}" FontWeight="SemiBold" Margin="0"/>
+   </StackPanel>
+  </Grid>
+ </Grid>
+</Window>

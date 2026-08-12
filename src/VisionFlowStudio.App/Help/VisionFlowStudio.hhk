@@ -1,0 +1,14 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN"><HTML><BODY><UL>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="项目 / Project"><param name="Local" value="manual.html#project"></OBJECT>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="流程 / Flow"><param name="Local" value="manual.html#flow"></OBJECT>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="相机 / Camera"><param name="Local" value="manual.html#camera"></OBJECT>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="硬件触发 / Hardware Trigger"><param name="Local" value="manual.html#trigger"></OBJECT>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="VisionMaster SOL"><param name="Local" value="manual.html#vision"></OBJECT>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="VisionPro VPP"><param name="Local" value="manual.html#vision"></OBJECT>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="HALCON HDVP"><param name="Local" value="manual.html#vision"></OBJECT>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="C# 脚本 / C# Script"><param name="Local" value="manual.html#script"></OBJECT>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="PLC 通信 / PLC Communication"><param name="Local" value="manual.html#communication"></OBJECT>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="自动保存 / Auto Save"><param name="Local" value="manual.html#settings"></OBJECT>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="项目加密 / Encryption"><param name="Local" value="manual.html#security"></OBJECT>
+<LI><OBJECT type="text/sitemap"><param name="Name" value="故障排查 / Troubleshooting"><param name="Local" value="manual.html#troubleshooting"></OBJECT>
+</UL></BODY></HTML>
