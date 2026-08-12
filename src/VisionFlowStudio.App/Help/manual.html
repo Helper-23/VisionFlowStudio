@@ -55,7 +55,13 @@
 <tr><td>CSharpScriptNode</td><td>流程上下文、任意节点 I/O</td><td>脚本声明输出</td></tr><tr><td>CommunicationWriteNode</td><td>多个视觉输出映射</td><td>各地址写入结果</td></tr></table>
 
 <h2 id="communication">8. 工业通信与多地址写入</h2>
-<p>先在“工具 → 通信配置”创建通道。窗口打开时会测试通道连接，并在窗口底部显示结果。流程中的通信写入节点通过下拉框选择通道和已暴露的视觉输出，可添加 N 条“数据源 → PLC 地址 → 数据类型”映射。</p>
+<p>先在“工具 → 通信配置”创建通道。窗口打开时会测试通道连接，并在窗口底部显示结果。流程中的通信写入节点通过下拉框选择通道和已暴露的视觉输出，可添加 N 条“数据源 → PLC 地址/JSON 路径 → 数据类型”映射。</p>
+<p>TCP/IP Client 与 TCP/IP Server 支持两类帧格式：<b>Terminator</b> 使用可配置的发送/接收结束符；<b>LengthPrefix</b> 使用 1/2/4/8 字节长度头并可选大端或小端。长度表示编码后的负载字节数，接收端会循环处理拆包和粘包。负载可选 <b>TextFields</b> 或 <b>Json</b>。</p>
+<p>JSON 接收字段可用 <code>Command</code>、<code>Data.Center1.X</code>、<code>Data.Trajectory[0].X</code> 等路径提取，保存为 <code>CommunicationTrigger.字段名</code>，供后续节点和高级脚本使用；非必填字段应勾选“可选”，缺失时返回空字符串。JSON 结果写入时，每条映射的地址列作为 JSON 路径；勾选“常量”可发送命令字、状态码等固定字段，<code>$Now</code>/<code>$UtcNow</code> 可作为动态时间源，<code>Json</code> 类型可发送对象或数组。</p>
+<p>任意流程节点都可增加 <code>RunWhenKey</code>、<code>RunWhenMode</code>、<code>RunWhenValue</code> 三个参数作为通用运行条件。例如相机 A 节点配置 <code>CommunicationTrigger.Camera / Equals / A</code>，收到其他相机指令时会自动跳过。相机采图节点还输出 <code>ExposureTime</code> 与 ISO8601 格式的 <code>ExposureTimeUtc</code>，可直接映射为结果时间戳。</p>
+<p>通信通道可配置 JSON 自动应答规则。规则按请求 JSON 路径匹配，模板中的 <code>{{CmdId}}</code> 等占位符会从当前请求原样取值；<code>{{Context:Ready}}</code>、<code>{{Context:Busy}}</code> 等可读取软件运行状态。自动应答在通信接收线程完成，适合 Heartbeat、QueryStatus 等不应等待视觉流程的指令。</p>
+<p>若上位机通过指令切换型号，可在通信触发区配置“命令字段、切换命令值、配方值字段”。配方值按型号名称、产品编码或从 0 开始的型号序号匹配；未配置时不会改变当前型号。</p>
+<p>一个项目可以让多个流程共用同一个 TCP/IP Server。请分别打开每个流程，在通信触发区选择同一个服务器通道，并为各流程设置不同的“匹配字段 + 指定字符串”（例如都提取 JSON 的 Camera 字段，三个流程分别填写 A、B、C）。点击“启动通信触发”后，软件只监听该共享服务器一次，并在当前型号的所有已启用流程中选择唯一命中的流程运行。若一条报文同时匹配多个流程，为避免相机误动作，本次报文不会执行任何流程并会记录路由冲突。</p>
 <table><tr><th>协议</th><th>地址示例</th><th>要点</th></tr><tr><td>Siemens S7Net</td><td>DB1.0、DB10.4</td><td>型号、Rack、Slot 与 PLC 匹配</td></tr>
 <tr><td>Mitsubishi MC ASCII</td><td>D100、M100</td><td>确认 ASCII 模式和网络号/站号</td></tr><tr><td>Modbus TCP/RTU</td><td>0、100、x=3;100</td><td>功能码、站号、字节序需一致</td></tr>
 <tr><td>Omron FINS TCP</td><td>D100、CIO100</td><td>节点号和地址区正确</td></tr><tr><td>Allen-Bradley EIP</td><td>TagName</td><td>使用 PLC 标签名及匹配数组长度</td></tr></table>
@@ -63,7 +69,7 @@
 
 <h2 id="trigger">9. 单次、连续、硬触发与 PLC 触发</h2>
 <ul><li><b>单次运行：</b>完整执行一次当前流程。</li><li><b>连续运行：</b>循环执行流程。相机为硬触发时，CameraGrabNode 每轮等待下一帧硬触发，然后继续执行后续节点。</li>
-<li><b>通讯触发：</b>轮询指定通道和地址，根据数据类型、触发值和边沿启动流程。建议使用上升沿并在流程结束后由 PLC 或软件复位握手位。</li>
+<li><b>通讯触发：</b>PLC 通道按地址值、数据类型和边沿启动；TCP 通道可匹配整帧，或先按分隔符、位置、JSON 路径提取字段后匹配指定值。接收字段、原始帧及连接标识都可供流程和高级脚本引用。</li>
 <li><b>单步：</b>仅运行选中节点；要求所需上游数据已经存在。</li><li><b>从当前运行：</b>从选中节点执行至末尾，适合调试流程后半段。</li></ul>
 <div class="warning">硬触发等待时间由相机节点超时控制。若生产节拍可能为 10 秒，相机节点超时不应仍为 1 秒；停止按钮会取消等待并释放循环。</div>
 

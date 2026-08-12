@@ -1,6 +1,6 @@
 # VisionFlow Studio 任务交接
 
-> 本文仅依据当前任务上下文整理，未重新遍历整个仓库。最后更新：2026-08-12。
+> 本文仅依据当前任务上下文整理，未重新遍历整个仓库。最后更新：2026-08-13。
 
 ## 1. 当前项目架构和主要模块
 
@@ -8,7 +8,7 @@
 - `VisionFlowStudio.App`：主界面、MVVM、项目/流程管理、设置窗口、平台调试窗口、图像视图和启动界面。
 - `VisionFlowStudio.Core`：流程、节点、项目结构、视觉平台适配接口及公共数据模型。
 - `VisionFlowStudio.Cameras`：Basler、Hikrobot/海康、大华工业相机枚举、连接、采图和参数控制。
-- `VisionFlowStudio.Communications`：基于 HslCommunication 7.0 的 PLC/工业协议通信。
+- `VisionFlowStudio.Communications`：基于 HslCommunication 7.0 的 PLC/工业协议通信，以及通用 TCP/IP Client/Server 文本与 JSON 通信。
 - `VisionFlowStudio.VisionMaster`：VisionMaster 4.4 `.sol` 加载、运行、输入图像注入和输出读取。
 - `VisionFlowStudio.VisionPro`：VisionPro ToolBlock/VPP 加载、运行和调试控件集成。
 - `VisionFlowStudio.Halcon`：HALCON/HDevEngine、`.hdvp` 过程调用和参数编辑。
@@ -29,6 +29,12 @@
 - 图像缩放、拖动、适应、1:1、鼠标坐标和灰度显示。
 - 多工站/多型号/多流程画面总览与单独弹出。
 - 通信通道管理、连接测试、多地址写入、视觉输出选择和 PLC 地址触发流程。
+- TCP/IP Client/Server 支持自定义收发结束符、字段分隔符，以及 1/2/4/8 字节大小端长度头分帧；接收端处理拆包/粘包。
+- TCP 接收支持按分隔符、字符位置和 JSONPath 提取字段，写入 `CommunicationTrigger.*`，可供流程节点和高级脚本引用。
+- TCP 结果可按多字段文本模板或 JSON 路径组装成单帧；支持固定常量、对象/数组和请求连接定向回包。
+- TCP JSON 自动应答规则可处理 Heartbeat、QueryStatus 等非视觉指令，并透传请求字段；流程节点可用 `RunWhen*` 按 Camera/Command 等字段条件执行。
+- TCP 通信触发现已支持项目级多流程路由：同一型号下的多个已启用流程可共用全局 TCP Server，并分别用自己的匹配字段/指定值选择唯一流程；冲突匹配会拒绝执行并记录错误。
+- 相机采图节点输出曝光时间及 UTC ISO8601 时间字符串，便于协议结果回传真实曝光时刻。
 - 支持 Siemens S7Net、Mitsubishi MC ASCII、Modbus TCP/RTU、Omron FINS TCP、Allen-Bradley EtherNet/IP 的设计入口。
 - C# 高级脚本节点：完整类式脚本、读取节点数据、声明输出、外部 DLL、`using`、编译检查、运行及编辑器补全基础能力。
 - 浅蓝色工业风 UI、启动画面、状态栏平台状态和实时时钟。
@@ -93,10 +99,10 @@ MainWindow
 
 ## 6. 当前编译状态
 
-- 最近一次明确看到的状态不是成功构建。
-- Visual Studio 报 `CS0006`：找不到 `VisionFlowStudio.exe` 和 `VisionFlowStudio.Licensing.dll` 元数据文件。
-- 根因倾向于 `VisionFlowStudio.Licensing`/许可证生成工具的输出类型或项目依赖配置错误：用户指出预期的 `VisionFlowStudio.LicenseTool.exe` 并未生成，现有项目看起来仍是类库。
-- 此后没有完成一次可确认的全解决方案编译和实际启动验证，因此应视为“编译待修复、待验证”。
+- 2026-08-13 已完成 `Release | x64` 全解决方案构建：0 warning、0 error。
+- 通信专项测试通过：原结束符文本协议、4 字节大端长度头 JSON、拆包/粘包、中文 UTF-8、JSONPath、嵌套 JSON 结果、自动应答、共享 TCP Server 多流程路由与应用层端到端调度。
+- 加密项目往返测试通过，新增 TCP/JSON/自动应答/字段提取配置可持久化。
+- C# 高级脚本回归测试通过，`CommunicationTrigger.*` 数据仍可通过脚本 API 引用。
 
 ## 7. 尚未解决的问题
 

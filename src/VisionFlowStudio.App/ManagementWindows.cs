@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO.Ports;
 using System.Linq;
@@ -88,23 +89,37 @@ namespace VisionFlowStudio.App
 
     public sealed class CommunicationManagerWindow : Window
     {
+        private sealed class AutoResponseRow
+        {
+            public bool Enabled { get; set; } = true;
+            public string MatchPath { get; set; } = "Command";
+            public string MatchMode { get; set; } = "Equals";
+            public string ExpectedValue { get; set; } = "Heartbeat";
+            public string ResponseTemplate { get; set; } = "{\"CmdId\":{{CmdId}},\"Command\":\"HeartbeatAck\"}";
+            public bool ConsumeMessage { get; set; } = true;
+            public CommunicationAutoResponseDefinition ToDefinition() { return new CommunicationAutoResponseDefinition { Enabled = Enabled, MatchPath = MatchPath ?? string.Empty, MatchMode = MatchMode ?? "Equals", ExpectedValue = ExpectedValue ?? string.Empty, ResponseTemplate = ResponseTemplate ?? string.Empty, ConsumeMessage = ConsumeMessage }; }
+        }
+
         private readonly MainViewModel _vm;
         private readonly DataGrid _grid;
+        private readonly DataGrid _responseGrid;
+        private readonly ObservableCollection<AutoResponseRow> _responses = new ObservableCollection<AutoResponseRow>();
+        private CommunicationDefinition _responseOwner;
         private readonly TextBlock _status;
         private bool _testingConnections;
 
         public CommunicationManagerWindow(MainViewModel vm)
         {
-            _vm = vm; Title = "通信配置"; Width = 1080; Height = 610; MinWidth = 820; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            _vm = vm; Title = "通信配置"; Width = 1280; Height = 720; MinWidth = 900; MinHeight = 520; WindowStartupLocation = WindowStartupLocation.CenterOwner;
             var root = new DockPanel { Margin = new Thickness(10) };
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             var add = new Button { Content = "＋ 新增通道" }; var delete = new Button { Content = "删除" }; var test = new Button { Content = "测试连接" }; var close = new Button { Content = "完成" };
             add.Click += delegate { var item = _vm.AddCommunication(); _grid.SelectedItem = item; _grid.ScrollIntoView(item); };
             delete.Click += delegate { _vm.RemoveCommunication(_grid.SelectedItem as CommunicationDefinition); };
             test.Click += delegate { TestSelected(); };
-            close.Click += delegate { _vm.CommitProjectStructure(); Close(); };
+            close.Click += delegate { SaveAutoResponses(); _vm.CommitProjectStructure(); Close(); };
             buttons.Children.Add(add); buttons.Children.Add(delete); buttons.Children.Add(test); buttons.Children.Add(close); DockPanel.SetDock(buttons, Dock.Top); root.Children.Add(buttons);
-            _status = new TextBlock { Text = "支持 TCP Client、TCP Server、Modbus TCP 和 SerialPort。", Margin = new Thickness(5, 10, 5, 4), Foreground = System.Windows.Media.Brushes.SlateGray }; DockPanel.SetDock(_status, Dock.Bottom); root.Children.Add(_status);
+            _status = new TextBlock { Text = "TCP/IP 支持结束符和长度头分帧；Payload 可选文本字段或 JSON。长度头模式会按字节长度循环拼包。", Margin = new Thickness(5, 10, 5, 4), Foreground = System.Windows.Media.Brushes.SlateGray, TextWrapping = TextWrapping.Wrap }; DockPanel.SetDock(_status, Dock.Bottom); root.Children.Add(_status);
             _grid = new DataGrid { ItemsSource = vm.Communications, AutoGenerateColumns = false, CanUserAddRows = false, SelectionMode = DataGridSelectionMode.Single, Margin = new Thickness(0, 8, 0, 0) };
             _grid.Columns.Add(new DataGridTextColumn { Header = "名称", Binding = new System.Windows.Data.Binding("Name"), Width = 100 });
             _grid.Columns.Add(new DataGridComboBoxColumn { Header = "协议", ItemsSource = CommunicationRegistry.Protocols, SelectedItemBinding = new System.Windows.Data.Binding("Protocol"), Width = 170 });
@@ -119,14 +134,55 @@ namespace VisionFlowStudio.App
             _grid.Columns.Add(new DataGridTextColumn { Header = "数据位", Binding = new System.Windows.Data.Binding("DataBits"), Width = 60 });
             _grid.Columns.Add(new DataGridTextColumn { Header = "校验", Binding = new System.Windows.Data.Binding("Parity"), Width = 65 });
             _grid.Columns.Add(new DataGridTextColumn { Header = "停止位", Binding = new System.Windows.Data.Binding("StopBits"), Width = 65 });
+            _grid.Columns.Add(new DataGridTextColumn { Header = "文本编码", Binding = new System.Windows.Data.Binding("TextEncoding"), Width = 85 });
+            _grid.Columns.Add(new DataGridComboBoxColumn { Header = "帧格式", ItemsSource = new[] { "Terminator", "LengthPrefix" }, SelectedItemBinding = new System.Windows.Data.Binding("FrameMode"), Width = 105 });
+            _grid.Columns.Add(new DataGridComboBoxColumn { Header = "负载格式", ItemsSource = new[] { "TextFields", "Json" }, SelectedItemBinding = new System.Windows.Data.Binding("PayloadFormat"), Width = 95 });
+            _grid.Columns.Add(new DataGridTextColumn { Header = "长度头字节", Binding = new System.Windows.Data.Binding("LengthPrefixBytes"), Width = 78 });
+            _grid.Columns.Add(new DataGridComboBoxColumn { Header = "字节序", ItemsSource = new[] { "BigEndian", "LittleEndian" }, SelectedItemBinding = new System.Windows.Data.Binding("LengthByteOrder"), Width = 95 });
+            _grid.Columns.Add(new DataGridTextColumn { Header = "最大帧字节", Binding = new System.Windows.Data.Binding("MaxFrameBytes"), Width = 90 });
+            _grid.Columns.Add(new DataGridTextColumn { Header = "字段分隔符", Binding = new System.Windows.Data.Binding("FieldSeparator"), Width = 85 });
+            _grid.Columns.Add(new DataGridTextColumn { Header = "发送结束符", Binding = new System.Windows.Data.Binding("SendTerminator"), Width = 85 });
+            _grid.Columns.Add(new DataGridTextColumn { Header = "接收结束符", Binding = new System.Windows.Data.Binding("ReceiveTerminator"), Width = 85 });
             _grid.Columns.Add(new DataGridCheckBoxColumn { Header = "启用", Binding = new System.Windows.Data.Binding("Enabled"), Width = 50 });
-            root.Children.Add(_grid); Content = root; Closed += delegate { _vm.CommitProjectStructure(); };
+            var responsePanel = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
+            var responseHeader = new StackPanel { Orientation = Orientation.Horizontal };
+            responseHeader.Children.Add(new TextBlock { Text = "TCP JSON 自动应答", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) });
+            var addResponse = new Button { Content = "＋ 添加规则" }; var deleteResponse = new Button { Content = "删除规则" };
+            addResponse.Click += delegate { _responses.Add(new AutoResponseRow()); _responseGrid.SelectedItem = _responses.Last(); };
+            deleteResponse.Click += delegate { var row = _responseGrid.SelectedItem as AutoResponseRow; if (row != null) _responses.Remove(row); };
+            responseHeader.Children.Add(addResponse); responseHeader.Children.Add(deleteResponse); DockPanel.SetDock(responseHeader, Dock.Top); responsePanel.Children.Add(responseHeader);
+            _responseGrid = new DataGrid { ItemsSource = _responses, AutoGenerateColumns = false, CanUserAddRows = false, MinHeight = 145, Margin = new Thickness(0, 6, 0, 0) };
+            _responseGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "启用", Binding = new System.Windows.Data.Binding("Enabled"), Width = 48 });
+            _responseGrid.Columns.Add(new DataGridTextColumn { Header = "匹配JSON路径", Binding = new System.Windows.Data.Binding("MatchPath"), Width = 130 });
+            _responseGrid.Columns.Add(new DataGridComboBoxColumn { Header = "方式", ItemsSource = new[] { "Equals", "Contains" }, SelectedItemBinding = new System.Windows.Data.Binding("MatchMode"), Width = 90 });
+            _responseGrid.Columns.Add(new DataGridTextColumn { Header = "目标值", Binding = new System.Windows.Data.Binding("ExpectedValue"), Width = 110 });
+            _responseGrid.Columns.Add(new DataGridTextColumn { Header = "应答JSON模板（{{路径}}引用请求）", Binding = new System.Windows.Data.Binding("ResponseTemplate"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+            _responseGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "应答后消费", Binding = new System.Windows.Data.Binding("ConsumeMessage"), Width = 88 });
+            responsePanel.Children.Add(_responseGrid); DockPanel.SetDock(responsePanel, Dock.Bottom); root.Children.Add(responsePanel);
+            root.Children.Add(_grid); Content = root; Closed += delegate { SaveAutoResponses(); _vm.CommitProjectStructure(); };
+            _grid.SelectionChanged += delegate { LoadAutoResponses(); };
             Loaded += async delegate { await TestEnabledOnOpenAsync(); };
+        }
+
+        private void LoadAutoResponses()
+        {
+            SaveAutoResponses();
+            _responses.Clear(); var selected = _grid.SelectedItem as CommunicationDefinition; _responseOwner = selected;
+            if (selected == null) return;
+            foreach (var item in selected.AutoResponses ?? new List<CommunicationAutoResponseDefinition>())
+                _responses.Add(new AutoResponseRow { Enabled = item.Enabled, MatchPath = item.MatchPath, MatchMode = item.MatchMode, ExpectedValue = item.ExpectedValue, ResponseTemplate = item.ResponseTemplate, ConsumeMessage = item.ConsumeMessage });
+        }
+
+        private void SaveAutoResponses()
+        {
+            if (_responseOwner == null) return;
+            _responseOwner.AutoResponses = _responses.Select(x => x.ToDefinition()).ToList();
         }
 
         private void TestSelected()
         {
             if (_testingConnections) return;
+            SaveAutoResponses();
             var item = _grid.SelectedItem as CommunicationDefinition;
             if (item == null) { _status.Text = "请先选择通信通道。"; return; }
             var result = _vm.CommunicationRegistry.TestConnection(item); _status.Text = result.Message;
@@ -135,7 +191,9 @@ namespace VisionFlowStudio.App
         private async Task TestEnabledOnOpenAsync()
         {
             if (_testingConnections) return;
-            var items = _vm.Communications.Where(x => x.Enabled).ToArray();
+            var items = _vm.Communications.Where(x => x.Enabled)
+                .OrderBy(x => string.Equals(x.Protocol, "TCP/IP Server", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ToArray();
             if (items.Length == 0) { _status.Text = "没有启用的通信通道。"; return; }
             if (_grid.SelectedItem == null) _grid.SelectedItem = items[0];
             _testingConnections = true;

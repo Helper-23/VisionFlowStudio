@@ -3,6 +3,6 @@
  <ItemGroup><ProjectReference Include="..\VisionFlowStudio.Core\VisionFlowStudio.Core.csproj"/></ItemGroup>
  <ItemGroup>
   <Reference Include="HslCommunication"><HintPath>..\..\lib\HslCommunication.7.0.0\HslCommunication.dll</HintPath><Private>true</Private></Reference>
-  <Reference Include="Microsoft.CSharp"/><Reference Include="System"/>
+  <Reference Include="Microsoft.CSharp"/><Reference Include="System"/><Reference Include="System.Core"/><Reference Include="System.Web.Extensions"/>
  </ItemGroup>
 </Project>

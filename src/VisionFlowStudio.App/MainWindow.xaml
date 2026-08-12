@@ -193,6 +193,8 @@
         <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel Margin="0,0,5,0"><TextBlock Text="类别" Foreground="{StaticResource MutedBrush}"/><TextBox Text="{Binding DisplayCategory}"/></StackPanel><StackPanel Grid.Column="1" Margin="5,0,0,0"><TextBlock Text="平台" Foreground="{StaticResource MutedBrush}"/><ComboBox ItemsSource="{Binding DataContext.AvailablePlatforms, RelativeSource={RelativeSource AncestorType=Window}}" SelectedItem="{Binding Platform}"/></StackPanel></Grid>
         <Grid Margin="0,9"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><CheckBox Content="启用节点" IsChecked="{Binding Enabled}" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="超时(ms)" Foreground="{StaticResource MutedBrush}"/><TextBox Text="{Binding TimeoutMs}"/></StackPanel></Grid>
         <TextBlock Text="错误策略" Foreground="{StaticResource MutedBrush}"/><ComboBox SelectedValue="{Binding OnError}" SelectedValuePath="Content" Margin="0,4,0,10"><ComboBoxItem Content="StopFlow"/><ComboBoxItem Content="Continue"/></ComboBox>
+        <TextBlock Text="通用运行条件（可选）" FontWeight="SemiBold" Margin="0,4,0,4"/>
+        <TextBlock Text="在节点参数中配置 RunWhenKey、RunWhenMode、RunWhenValue。示例：CommunicationTrigger.Camera / Equals / A。未满足时该节点跳过。" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
         <TextBlock Text="节点参数" FontWeight="SemiBold" Margin="0,5"/>
         <StackPanel Margin="0,0,0,8">
          <StackPanel.Style>
@@ -273,32 +275,60 @@
       </TabItem>
       <TabItem Header="通讯">
        <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="13">
-        <TextBlock Text="HslCommunication 通道" Foreground="{StaticResource MutedBrush}"/><ComboBox ItemsSource="{Binding AvailableCommunicationChannels}" SelectedItem="{Binding CommunicationChannel}" IsEditable="True" Margin="0,4,0,8"/>
-        <TextBlock Text="多地址写入映射" FontWeight="SemiBold" Margin="0,4,0,5"/>
+        <TextBlock Text="通信通道" Foreground="{StaticResource MutedBrush}"/><ComboBox ItemsSource="{Binding AvailableCommunicationChannels}" SelectedItem="{Binding CommunicationChannel}" IsEditable="True" Margin="0,4,0,8"/>
+        <TextBlock Text="多项结果写入映射" FontWeight="SemiBold" Margin="0,4,0,5"/>
         <DataGrid ItemsSource="{Binding CommunicationWrites}" SelectedItem="{Binding SelectedCommunicationWrite}" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" MinHeight="230" Margin="0,0,0,8">
          <DataGrid.Columns>
           <DataGridCheckBoxColumn Header="启用" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="48"/>
-          <DataGridTemplateColumn Header="视觉输出" Width="2*"><DataGridTemplateColumn.CellTemplate><DataTemplate><ComboBox ItemsSource="{Binding DataContext.AvailableDataSources, RelativeSource={RelativeSource AncestorType=Window}}" Text="{Binding SourceKey, UpdateSourceTrigger=LostFocus}" IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-          <DataGridTextColumn Header="PLC 地址" Binding="{Binding Address, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+          <DataGridTemplateColumn Header="流程输出" Width="2*"><DataGridTemplateColumn.CellTemplate><DataTemplate><ComboBox ItemsSource="{Binding DataContext.AvailableDataSources, RelativeSource={RelativeSource AncestorType=Window}}" Text="{Binding SourceKey, UpdateSourceTrigger=LostFocus}" IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+          <DataGridCheckBoxColumn Header="常量" Binding="{Binding UseConstant, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+          <DataGridTextColumn Header="常量值" Binding="{Binding ConstantValue, UpdateSourceTrigger=PropertyChanged}" Width="90"/>
+          <DataGridTextColumn Header="PLC地址 / TCP模板 / JSON路径" Binding="{Binding Address, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
           <DataGridTemplateColumn Header="数据类型" Width="110"><DataGridTemplateColumn.CellTemplate><DataTemplate><ComboBox ItemsSource="{Binding DataContext.AvailableCommunicationDataTypes, RelativeSource={RelativeSource AncestorType=Window}}" SelectedItem="{Binding DataType, UpdateSourceTrigger=PropertyChanged}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
          </DataGrid.Columns>
         </DataGrid>
         <WrapPanel><Button Content="+添加写入" Click="AddCommunicationWrite_Click" Style="{StaticResource PrimaryButton}"/><Button Content="删除写入" Click="RemoveCommunicationWrite_Click"/><Button Content="添加通讯节点" Click="AddCommunicationNode_Click"/><Button Content="运行选中节点" Command="{Binding RunSelectedCommand}"/><Button Content="管理通信通道" Click="CommunicationManager_Click"/></WrapPanel>
         <Separator Margin="0,12,0,8"/>
-        <TextBlock Text="流程运行与 PLC 触发" FontWeight="SemiBold" Margin="0,0,0,6"/>
+        <TextBlock Text="流程运行与通信触发" FontWeight="SemiBold" Margin="0,0,0,6"/>
         <Grid>
          <Grid.ColumnDefinitions><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
          <TextBlock Grid.Row="0" Text="连续间隔(ms)" VerticalAlignment="Center"/><TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ContinuousIntervalMs, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"/>
          <TextBlock Grid.Row="1" Text="触发通道" VerticalAlignment="Center"/><ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding AvailableCommunicationChannels}" SelectedItem="{Binding TriggerChannel}" IsEditable="True" Margin="0,2"/>
-         <TextBlock Grid.Row="2" Text="读取地址" VerticalAlignment="Center"/><TextBox Grid.Row="2" Grid.Column="1" Text="{Binding TriggerAddress, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"/>
-         <TextBlock Grid.Row="3" Text="数据类型" VerticalAlignment="Center"/><ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding AvailableTriggerDataTypes}" SelectedItem="{Binding TriggerDataType}" Margin="0,2"/>
+         <TextBlock Grid.Row="2" Text="{Binding TriggerAddressLabel}" VerticalAlignment="Center"/><TextBox Grid.Row="2" Grid.Column="1" Text="{Binding TriggerAddress, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsPlcTriggerChannel}" Margin="0,2"/>
+         <TextBlock Grid.Row="3" Text="{Binding TriggerDataTypeLabel}" VerticalAlignment="Center"/><ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding AvailableTriggerDataTypes}" SelectedItem="{Binding TriggerDataType}" IsEnabled="{Binding IsPlcTriggerChannel}" Margin="0,2"/>
          <TextBlock Grid.Row="4" Text="触发方式" VerticalAlignment="Center"/><ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding AvailableTriggerModes}" SelectedItem="{Binding TriggerMode}" Margin="0,2"/>
-         <TextBlock Grid.Row="5" Text="目标值" VerticalAlignment="Center"/><TextBox Grid.Row="5" Grid.Column="1" Text="{Binding TriggerExpectedValue, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"/>
-         <TextBlock Grid.Row="6" Text="轮询周期(ms)" VerticalAlignment="Center"/><TextBox Grid.Row="6" Grid.Column="1" Text="{Binding TriggerPollIntervalMs, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"/>
+         <TextBlock Grid.Row="5" Text="触发匹配字段" VerticalAlignment="Center"/><ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding AvailableTriggerMatchFields}" SelectedItem="{Binding TriggerMatchField}" IsEnabled="{Binding IsTcpTriggerChannel}" IsEditable="True" Margin="0,2" ToolTip="留空时匹配完整接收帧"/>
+         <TextBlock Grid.Row="6" Text="{Binding TriggerExpectedValueLabel}" VerticalAlignment="Center"/><TextBox Grid.Row="6" Grid.Column="1" Text="{Binding TriggerExpectedValue, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"/>
+         <TextBlock Grid.Row="7" Text="轮询周期(ms)" VerticalAlignment="Center"/><TextBox Grid.Row="7" Grid.Column="1" Text="{Binding TriggerPollIntervalMs, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"/>
         </Grid>
-        <TextBlock Text="RisingEdge: 0→非0；ValueEquals: 进入目标值时触发；AnyChange: 数值变化时触发" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
-        <WrapPanel Margin="0,8,0,0"><Button Content="单次运行" Command="{Binding RunAllCommand}" Style="{StaticResource PrimaryButton}"/><Button Content="连续运行" Command="{Binding RunContinuousCommand}"/><Button Content="启动 PLC 触发" Command="{Binding RunCommunicationTriggerCommand}"/><Button Content="停止" Command="{Binding StopCommand}"/></WrapPanel>
+        <TextBlock Text="{Binding TriggerHelpText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+        <TextBlock Text="TCP 接收字段提取" FontWeight="SemiBold" Margin="0,10,0,5"/>
+        <DataGrid ItemsSource="{Binding CommunicationTriggerFields}" SelectedItem="{Binding SelectedTriggerField}" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" IsEnabled="{Binding IsTcpTriggerChannel}" MinHeight="150" Margin="0,0,0,5">
+         <DataGrid.Columns>
+          <DataGridTextColumn Header="字段名 / 数据Key" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="2*"/>
+          <DataGridTemplateColumn Header="提取方式" Width="100"><DataGridTemplateColumn.CellTemplate><DataTemplate><ComboBox ItemsSource="{Binding DataContext.AvailableCommunicationFieldModes, RelativeSource={RelativeSource AncestorType=Window}}" SelectedItem="{Binding Mode, UpdateSourceTrigger=PropertyChanged}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+          <DataGridTextColumn Header="字段序号(0起)" Binding="{Binding FieldIndex, UpdateSourceTrigger=PropertyChanged}" Width="95"/>
+          <DataGridTextColumn Header="起始位置(0起)" Binding="{Binding Start, UpdateSourceTrigger=PropertyChanged}" Width="95"/>
+          <DataGridTextColumn Header="长度(0到末尾)" Binding="{Binding Length, UpdateSourceTrigger=PropertyChanged}" Width="105"/>
+          <DataGridTextColumn Header="JSON路径" Binding="{Binding JsonPath, UpdateSourceTrigger=PropertyChanged}" Width="130"/>
+          <DataGridCheckBoxColumn Header="可选" Binding="{Binding Optional, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+          <DataGridCheckBoxColumn Header="去空白" Binding="{Binding Trim, UpdateSourceTrigger=PropertyChanged}" Width="60"/>
+         </DataGrid.Columns>
+        </DataGrid>
+        <WrapPanel><Button Content="+添加提取字段" Click="AddCommunicationTriggerField_Click" IsEnabled="{Binding IsTcpTriggerChannel}"/><Button Content="删除提取字段" Click="RemoveCommunicationTriggerField_Click" IsEnabled="{Binding IsTcpTriggerChannel}"/></WrapPanel>
+        <TextBlock Text="分隔提取：字段序号从 0 开始；位置提取按解码字符计算；JSON 路径示例 Command、Data.Center1.X、Data.Trajectory[0].X。脚本可使用 Get&lt;string&gt;(&quot;CommunicationTrigger.字段名&quot;)。" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+        <TextBlock Text="可选配方切换" FontWeight="SemiBold" Margin="0,10,0,4"/>
+        <Grid IsEnabled="{Binding IsTcpTriggerChannel}">
+         <Grid.ColumnDefinitions><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+         <TextBlock Grid.Row="0" Text="命令字段" VerticalAlignment="Center"/><ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding AvailableTriggerMatchFields}" SelectedItem="{Binding RecipeSwitchCommandField}" IsEditable="True" Margin="0,2"/>
+         <TextBlock Grid.Row="1" Text="切换命令值" VerticalAlignment="Center"/><TextBox Grid.Row="1" Grid.Column="1" Text="{Binding RecipeSwitchCommandValue, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"/>
+         <TextBlock Grid.Row="2" Text="配方值字段" VerticalAlignment="Center"/><ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AvailableTriggerMatchFields}" SelectedItem="{Binding RecipeSwitchValueField}" IsEditable="True" Margin="0,2"/>
+        </Grid>
+        <TextBlock Text="配方值可匹配型号名称、产品编码，或使用从 0 开始的型号序号。命令/值字段留空时禁用此功能。" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        <TextBlock Text="TCP 文本字段模式会合并为一帧；JSON 模式把每行“JSON路径”组装成嵌套对象。勾选常量可发送 Command、Result 等固定值；$Now/$UtcNow 可作为动态时间数据源。" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+        <WrapPanel Margin="0,8,0,0"><Button Content="单次运行" Command="{Binding RunAllCommand}" Style="{StaticResource PrimaryButton}"/><Button Content="连续运行" Command="{Binding RunContinuousCommand}"/><Button Content="启动通信触发" Command="{Binding RunCommunicationTriggerCommand}"/><Button Content="停止" Command="{Binding StopCommand}"/></WrapPanel>
        </StackPanel></ScrollViewer>
       </TabItem>
      </TabControl>

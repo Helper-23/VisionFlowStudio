@@ -183,7 +183,43 @@ namespace VisionFlowStudio.Core
         [DataMember] public int ConnectTimeoutMs { get; set; } = 3000;
         [DataMember] public int ReceiveTimeoutMs { get; set; } = 3000;
         [DataMember] public int HeartbeatIntervalMs { get; set; } = 1000;
+        [DataMember] public string TextEncoding { get; set; } = "UTF-8";
+        [DataMember] public string FrameMode { get; set; } = "Terminator";
+        [DataMember] public int LengthPrefixBytes { get; set; } = 4;
+        [DataMember] public string LengthByteOrder { get; set; } = "BigEndian";
+        [DataMember] public int MaxFrameBytes { get; set; } = 4194304;
+        [DataMember] public string PayloadFormat { get; set; } = "TextFields";
+        [DataMember] public string FieldSeparator { get; set; } = "|";
+        [DataMember] public string SendTerminator { get; set; } = "\\r\\n";
+        [DataMember] public string ReceiveTerminator { get; set; } = "\\r\\n";
+        // Retained for projects saved before separate send/receive terminators were introduced.
+        [DataMember] public string MessageTerminator { get; set; } = "\\r\\n";
+        [DataMember] public List<CommunicationAutoResponseDefinition> AutoResponses { get; set; } = new List<CommunicationAutoResponseDefinition>();
         [DataMember] public bool Enabled { get; set; } = true;
+    }
+
+    [DataContract]
+    public sealed class CommunicationAutoResponseDefinition
+    {
+        [DataMember] public bool Enabled { get; set; } = true;
+        [DataMember] public string MatchPath { get; set; } = "Command";
+        [DataMember] public string MatchMode { get; set; } = "Equals";
+        [DataMember] public string ExpectedValue { get; set; } = "Heartbeat";
+        [DataMember] public string ResponseTemplate { get; set; } = "{\"CmdId\":{{CmdId}},\"Command\":\"HeartbeatAck\"}";
+        [DataMember] public bool ConsumeMessage { get; set; } = true;
+    }
+
+    [DataContract]
+    public sealed class CommunicationFieldExtractionDefinition
+    {
+        [DataMember] public string Name { get; set; } = "SerialNumber";
+        [DataMember] public string Mode { get; set; } = "Delimited";
+        [DataMember] public int FieldIndex { get; set; }
+        [DataMember] public int Start { get; set; }
+        [DataMember] public int Length { get; set; }
+        [DataMember] public string JsonPath { get; set; } = string.Empty;
+        [DataMember] public bool Optional { get; set; }
+        [DataMember] public bool Trim { get; set; } = true;
     }
 
     [DataContract]
@@ -194,7 +230,12 @@ namespace VisionFlowStudio.Core
         [DataMember] public string DataType { get; set; } = "Bool";
         [DataMember] public string Mode { get; set; } = "RisingEdge";
         [DataMember] public string ExpectedValue { get; set; } = "True";
+        [DataMember] public string MatchField { get; set; } = string.Empty;
+        [DataMember] public string RecipeSwitchCommandField { get; set; } = string.Empty;
+        [DataMember] public string RecipeSwitchCommandValue { get; set; } = "SetMode";
+        [DataMember] public string RecipeSwitchValueField { get; set; } = string.Empty;
         [DataMember] public int PollIntervalMs { get; set; } = 100;
+        [DataMember] public List<CommunicationFieldExtractionDefinition> Fields { get; set; } = new List<CommunicationFieldExtractionDefinition>();
     }
 
     [DataContract]

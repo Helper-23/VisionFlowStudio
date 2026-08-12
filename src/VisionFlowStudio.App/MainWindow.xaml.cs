@@ -171,6 +171,16 @@ namespace VisionFlowStudio.App
             _viewModel.RemoveSelectedCommunicationWrite();
         }
 
+        private void AddCommunicationTriggerField_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.AddCommunicationTriggerField();
+        }
+
+        private void RemoveCommunicationTriggerField_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.RemoveSelectedCommunicationTriggerField();
+        }
+
         private void BrowseVpp_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new OpenFileDialog { Filter = "VisionPro ToolBlock (*.vpp)|*.vpp|所有文件 (*.*)|*.*", CheckFileExists = true };

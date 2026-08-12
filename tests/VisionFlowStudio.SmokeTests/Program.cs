@@ -1,6 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.Serialization.Json;
 using System.Threading;
@@ -134,23 +138,28 @@ namespace VisionFlowStudio.SmokeTests
         {
             var context = new VisionContext();
             context.Set("VisionMaster 流程.CodeStr", "ABC123");
+            context.Set("CommunicationTrigger.SerialNumber", "SN001");
+            context.Set("CommunicationTrigger.CmdId", "1742345678901");
             var vm = new ScriptToolSnapshot { Name = "VisionMaster 流程", NodeId = "vm-1", NodeType = "VisionMasterProcedureNode", Platform = "VisionMaster" };
             vm.Inputs["ProcedureName"] = "流程1";
             vm.Outputs["CodeStr"] = "ABC123";
+            var communication = new ScriptToolSnapshot { Name = "CommunicationTrigger", NodeId = "CommunicationTrigger", NodeType = "CommunicationTrigger", Platform = "Communication" };
+            communication.Outputs["SerialNumber"] = "SN001";
+            communication.Outputs["CmdId"] = "1742345678901";
             var config = new ScriptNodeConfig
             {
-                Code = "var code = GetNodeOutput<string>(\"VisionMaster 流程\", \"CodeStr\");\nSetOutput(\"Code\", code);\nSetOutput(\"Length\", code.Length);\nSetOutput(\"Procedure\", GetNodeInput<string>(\"VisionMaster 流程\", \"ProcedureName\"));\nSetOutput(\"ExternalType\", typeof(HslCommunication.Profinet.Siemens.SiemensS7Net).Name);",
+                Code = "var code = GetNodeOutput<string>(\"VisionMaster 流程\", \"CodeStr\");\nSetOutput(\"Code\", code);\nSetOutput(\"Length\", code.Length);\nSetOutput(\"Procedure\", GetNodeInput<string>(\"VisionMaster 流程\", \"ProcedureName\"));\nSetOutput(\"SerialNumber\", Get<string>(\"CommunicationTrigger.SerialNumber\"));\nSetOutput(\"SerialNumberByTool\", GetNodeOutput<string>(\"CommunicationTrigger\", \"SerialNumber\"));\nSetOutput(\"CmdId\", Get<long>(\"CommunicationTrigger.CmdId\"));\nSetOutput(\"ExternalType\", typeof(HslCommunication.Profinet.Siemens.SiemensS7Net).Name);",
                 References = new[] { Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "HslCommunication.dll") },
                 Imports = new[] { "System", "System.Linq" },
-                DeclaredOutputs = new[] { "Code", "Length", "Procedure", "ExternalType" }
+                DeclaredOutputs = new[] { "Code", "Length", "Procedure", "SerialNumber", "SerialNumberByTool", "CmdId", "ExternalType" }
             };
             var engine = new CSharpScriptEngine();
             var compile = engine.Compile(config);
             if (!compile.Success) throw new InvalidOperationException("Script compile failed: " + string.Join(Environment.NewLine, compile.Diagnostics));
-            var globals = new ScriptGlobals(context, new[] { vm }, CancellationToken.None);
+            var globals = new ScriptGlobals(context, new[] { vm, communication }, CancellationToken.None);
             var result = engine.RunAsync(config, globals, CancellationToken.None).GetAwaiter().GetResult();
             if (result.Status != NodeRunStatus.Ok) throw new InvalidOperationException(result.Message);
-            if (Convert.ToString(result.Outputs["Code"]) != "ABC123" || Convert.ToInt32(result.Outputs["Length"]) != 6 || Convert.ToString(result.Outputs["Procedure"]) != "流程1" || Convert.ToString(result.Outputs["ExternalType"]) != "SiemensS7Net")
+            if (Convert.ToString(result.Outputs["Code"]) != "ABC123" || Convert.ToInt32(result.Outputs["Length"]) != 6 || Convert.ToString(result.Outputs["Procedure"]) != "流程1" || Convert.ToString(result.Outputs["SerialNumber"]) != "SN001" || Convert.ToString(result.Outputs["SerialNumberByTool"]) != "SN001" || Convert.ToInt64(result.Outputs["CmdId"]) != 1742345678901L || Convert.ToString(result.Outputs["ExternalType"]) != "SiemensS7Net")
                 throw new InvalidOperationException("Script output mismatch.");
 
             var completionConfig = new ScriptNodeConfig { Code = "Context." };
@@ -162,7 +171,7 @@ namespace VisionFlowStudio.SmokeTests
 
             var classConfig = new ScriptNodeConfig { Code = CSharpScriptEngine.DefaultClassTemplate, DeclaredOutputs = new[] { "Result", "IsOK" } };
             var classCompile = engine.Compile(classConfig); if (!classCompile.Success) throw new InvalidOperationException("Class script compile failed: " + string.Join(Environment.NewLine, classCompile.Diagnostics));
-            var classResult = engine.RunAsync(classConfig, new ScriptGlobals(context, new[] { vm }, CancellationToken.None), CancellationToken.None).GetAwaiter().GetResult();
+            var classResult = engine.RunAsync(classConfig, new ScriptGlobals(context, new[] { vm, communication }, CancellationToken.None), CancellationToken.None).GetAwaiter().GetResult();
             if (classResult.Status != NodeRunStatus.Ok || Convert.ToString(classResult.Outputs["Result"]) != "ABC123") throw new InvalidOperationException("Class script output mismatch: " + classResult.Message);
             var completionPosition = classConfig.Code.IndexOf("SetOutput", StringComparison.Ordinal) + 4;
             var classCompletions = engine.GetCompletions(classConfig, completionPosition);
@@ -304,7 +313,6 @@ namespace VisionFlowStudio.SmokeTests
                     if (visionMaster.GetOutputsCallCount != 0)
                         throw new InvalidOperationException("MainViewModel startup performed synchronous VisionMaster output discovery.");
                     model.ProjectName = "RoundTripProject";
-
                     SetProjectFlow(model, "Station_01", "Model_A", "Station01_ModelA", "A_Delay_Unique");
 
                     var modelB = model.AddRecipe();
@@ -321,6 +329,20 @@ namespace VisionFlowStudio.SmokeTests
                     model.FlowName = "Station01_ModelA_Second";
                     model.AddNode("DelayNode");
                     model.SelectedNode.NodeName = "A2_Delay_Unique";
+                    model.ActivateStationRecipe(firstFlow);
+
+                    var tcpChannel = model.Communications[0];
+                    tcpChannel.Name = "TCP_SERVER_01"; tcpChannel.Protocol = "TCP/IP Server"; tcpChannel.Host = "0.0.0.0"; tcpChannel.Port = 9100;
+                    tcpChannel.TextEncoding = "UTF-8"; tcpChannel.FrameMode = "LengthPrefix"; tcpChannel.LengthPrefixBytes = 4; tcpChannel.LengthByteOrder = "BigEndian"; tcpChannel.MaxFrameBytes = 2097152; tcpChannel.PayloadFormat = "Json";
+                    tcpChannel.FieldSeparator = "<SEP>"; tcpChannel.SendTerminator = "<SEND_END>"; tcpChannel.ReceiveTerminator = "<RECV_END>";
+                    tcpChannel.AutoResponses.Add(new CommunicationAutoResponseDefinition { MatchPath = "Command", ExpectedValue = "Heartbeat", ResponseTemplate = "{\"CmdId\":{{CmdId}},\"Command\":\"HeartbeatAck\"}" });
+                    model.TriggerChannel = tcpChannel.Name; model.TriggerMode = "TextEquals"; model.TriggerExpectedValue = "RUN"; model.TriggerMatchField = "Command";
+                    model.RecipeSwitchCommandField = "Command"; model.RecipeSwitchCommandValue = "SetMode"; model.RecipeSwitchValueField = "RecipeMode";
+                    model.CommunicationTriggerFields.Add(new CommunicationFieldExtractionViewModel { Name = "Command", Mode = "Delimited", FieldIndex = 0, Trim = true });
+                    model.CommunicationTriggerFields.Add(new CommunicationFieldExtractionViewModel { Name = "SerialNumber", Mode = "Delimited", FieldIndex = 1, Trim = true });
+                    model.CommunicationTriggerFields.Add(new CommunicationFieldExtractionViewModel { Name = "Model", Mode = "Position", Start = 10, Length = 7, Trim = true });
+                    model.CommunicationTriggerFields.Add(new CommunicationFieldExtractionViewModel { Name = "TaskId", Mode = "JsonPath", JsonPath = "TaskId", Trim = true });
+                    model.CommunicationTriggerFields.Add(new CommunicationFieldExtractionViewModel { Name = "RecipeMode", Mode = "JsonPath", JsonPath = "RecipeMode", Optional = true, Trim = true });
 
                     model.SaveProject(path, password);
                 }
@@ -365,6 +387,11 @@ namespace VisionFlowStudio.SmokeTests
                         throw new InvalidOperationException(string.Format("Image document count must match flow count. Images={0}, Flows={1}", restored.ImageDocuments.Count, restored.StationFlows.Count));
                     if (restored.ImageDocuments.Any(x => x.Key.StartsWith("CAMERA|", StringComparison.OrdinalIgnoreCase)))
                         throw new InvalidOperationException("A standalone camera image document was created.");
+                    var restoredTcp = restored.Communications.FirstOrDefault(x => string.Equals(x.Name, "TCP_SERVER_01", StringComparison.OrdinalIgnoreCase));
+                    if (restoredTcp == null || restoredTcp.FrameMode != "LengthPrefix" || restoredTcp.LengthPrefixBytes != 4 || restoredTcp.LengthByteOrder != "BigEndian" || restoredTcp.MaxFrameBytes != 2097152 || restoredTcp.PayloadFormat != "Json" || restoredTcp.FieldSeparator != "<SEP>" || restoredTcp.SendTerminator != "<SEND_END>" || restoredTcp.ReceiveTerminator != "<RECV_END>" || restoredTcp.AutoResponses == null || restoredTcp.AutoResponses.Count != 1)
+                        throw new InvalidOperationException("TCP channel delimiters were not restored from the encrypted project.");
+                    if (restored.TriggerChannel != "TCP_SERVER_01" || restored.TriggerMode != "TextEquals" || restored.TriggerMatchField != "Command" || restored.RecipeSwitchCommandField != "Command" || restored.RecipeSwitchCommandValue != "SetMode" || restored.RecipeSwitchValueField != "RecipeMode" || restored.CommunicationTriggerFields.Count != 5 || restored.CommunicationTriggerFields[1].Name != "SerialNumber" || restored.CommunicationTriggerFields[2].Mode != "Position" || restored.CommunicationTriggerFields[3].Mode != "JsonPath" || restored.CommunicationTriggerFields[3].JsonPath != "TaskId" || restored.CommunicationTriggerFields[4].JsonPath != "RecipeMode" || !restored.CommunicationTriggerFields[4].Optional)
+                        throw new InvalidOperationException("TCP trigger extraction settings were not restored from the encrypted project.");
 
                     AssertProjectFlow(restored, "Station_01", "Model_A", "Station01_ModelA", "A_Delay_Unique");
                     AssertProjectFlow(restored, "Station_01", "Model_B", "Station01_ModelB", "B_Delay_Unique");
@@ -525,11 +552,339 @@ namespace VisionFlowStudio.SmokeTests
             };
             foreach (var name in requiredTypes)
                 if (hsl.GetType(name, false) == null) throw new TypeLoadException(name);
-            if (CommunicationRegistry.Protocols.Length != requiredTypes.Length)
+            if (CommunicationRegistry.Protocols.Length < requiredTypes.Length + 2 ||
+                !CommunicationRegistry.Protocols.Contains("TCP/IP Client") ||
+                !CommunicationRegistry.Protocols.Contains("TCP/IP Server"))
                 throw new InvalidOperationException("Communication protocol registry is incomplete.");
+            TestCommunicationConfigurationRoundTrip();
+            TestTcpFlowRouting();
+            TestTcpTextRoundTrip();
+            TestTcpLengthPrefixedJsonRoundTrip();
+            TestTcpFlowDispatcherEndToEnd();
             Console.WriteLine("PASS HSL: " + hsl.GetName().Version + ", protocols=" + string.Join(", ", CommunicationRegistry.Protocols));
             Console.WriteLine("DATA TYPES: " + string.Join(", ", CommunicationRegistry.DataTypes));
             return 0;
+        }
+
+        private static void TestCommunicationConfigurationRoundTrip()
+        {
+            var document = new FlowDocument
+            {
+                CommunicationTrigger = new CommunicationTriggerDefinition
+                {
+                    Channel = "TCP_SERVER",
+                    Mode = "TextEquals",
+                    ExpectedValue = "RUN",
+                    MatchField = "Command",
+                    RecipeSwitchCommandField = "Command",
+                    RecipeSwitchCommandValue = "SetMode",
+                    RecipeSwitchValueField = "RecipeMode",
+                    Fields = new List<CommunicationFieldExtractionDefinition>
+                    {
+                        new CommunicationFieldExtractionDefinition { Name = "Command", Mode = "Delimited", FieldIndex = 0 },
+                        new CommunicationFieldExtractionDefinition { Name = "SerialNumber", Mode = "Delimited", FieldIndex = 1 },
+                        new CommunicationFieldExtractionDefinition { Name = "Model", Mode = "Position", Start = 10, Length = 7 },
+                        new CommunicationFieldExtractionDefinition { Name = "TaskId", Mode = "JsonPath", JsonPath = "TaskId" }
+                    }
+                }
+            };
+            var serializer = new DataContractJsonSerializer(typeof(FlowDocument));
+            using (var stream = new MemoryStream())
+            {
+                serializer.WriteObject(stream, document); stream.Position = 0;
+                var restored = (FlowDocument)serializer.ReadObject(stream);
+                if (restored == null || restored.CommunicationTrigger == null || restored.CommunicationTrigger.MatchField != "Command" || restored.CommunicationTrigger.RecipeSwitchCommandField != "Command" || restored.CommunicationTrigger.RecipeSwitchValueField != "RecipeMode" || restored.CommunicationTrigger.Fields == null || restored.CommunicationTrigger.Fields.Count != 4 || restored.CommunicationTrigger.Fields[2].Mode != "Position" || restored.CommunicationTrigger.Fields[3].Mode != "JsonPath" || restored.CommunicationTrigger.Fields[3].JsonPath != "TaskId")
+                    throw new InvalidOperationException("TCP communication trigger extraction settings were not serialized correctly.");
+            }
+            var channelSerializer = new DataContractJsonSerializer(typeof(CommunicationDefinition));
+            using (var stream = new MemoryStream())
+            {
+                channelSerializer.WriteObject(stream, new CommunicationDefinition { Protocol = "TCP/IP Server", FrameMode = "LengthPrefix", LengthPrefixBytes = 4, LengthByteOrder = "BigEndian", MaxFrameBytes = 1024, PayloadFormat = "Json", FieldSeparator = "<SEP>", SendTerminator = "<SEND_END>", ReceiveTerminator = "<RECV_END>", AutoResponses = new List<CommunicationAutoResponseDefinition> { new CommunicationAutoResponseDefinition { MatchPath = "Command", ExpectedValue = "Heartbeat", ResponseTemplate = "{\"CmdId\":{{CmdId}},\"Command\":\"HeartbeatAck\"}" } } }); stream.Position = 0;
+                var restored = (CommunicationDefinition)channelSerializer.ReadObject(stream);
+                if (restored.FrameMode != "LengthPrefix" || restored.LengthPrefixBytes != 4 || restored.LengthByteOrder != "BigEndian" || restored.MaxFrameBytes != 1024 || restored.PayloadFormat != "Json" || restored.FieldSeparator != "<SEP>" || restored.SendTerminator != "<SEND_END>" || restored.ReceiveTerminator != "<RECV_END>" || restored.AutoResponses == null || restored.AutoResponses.Count != 1)
+                    throw new InvalidOperationException("TCP delimiter settings were not serialized correctly.");
+            }
+            Console.WriteLine("PASS TCP/IP communication configuration round trip");
+        }
+
+        private static void TestTcpFlowRouting()
+        {
+            var channel = new CommunicationDefinition { Name = "GLOBAL_TCP_SERVER", Protocol = "TCP/IP Server", PayloadFormat = "Json" };
+            var flows = new[] { "A", "B", "C" }.Select(camera => new StationRecipeFlowDefinition
+            {
+                StationName = "Station_" + camera,
+                RecipeName = "Model_A",
+                FlowId = "Camera_" + camera,
+                FlowName = "Camera " + camera,
+                Enabled = true,
+                Flow = new FlowDocument
+                {
+                    CommunicationTrigger = new CommunicationTriggerDefinition
+                    {
+                        Channel = channel.Name,
+                        Mode = "TextEquals",
+                        MatchField = "Camera",
+                        ExpectedValue = camera,
+                        Fields = new List<CommunicationFieldExtractionDefinition>
+                        {
+                            new CommunicationFieldExtractionDefinition { Name = "Command", Mode = "JsonPath", JsonPath = "Command" },
+                            new CommunicationFieldExtractionDefinition { Name = "Camera", Mode = "JsonPath", JsonPath = "Camera" },
+                            new CommunicationFieldExtractionDefinition { Name = "TaskId", Mode = "JsonPath", JsonPath = "TaskId" }
+                        }
+                    }
+                }
+            }).ToList();
+
+            var evaluations = TcpFlowRouteEvaluator.Evaluate(
+                flows,
+                channel,
+                "{\"Command\":\"Trigger\",\"Camera\":\"B\",\"TaskId\":\"SN-002\"}",
+                "connection-2");
+            var matches = evaluations.Where(x => x.Matched).ToList();
+            if (matches.Count != 1 || matches[0].Flow.FlowId != "Camera_B")
+                throw new InvalidOperationException("Shared TCP server did not select the unique Camera B flow.");
+            if (Convert.ToString(matches[0].TriggerData["CommunicationTrigger.TaskId"]) != "SN-002" ||
+                Convert.ToString(matches[0].TriggerData["CommunicationTrigger.ConnectionId"]) != "connection-2")
+                throw new InvalidOperationException("Shared TCP route did not preserve extracted trigger context.");
+
+            flows[2].Flow.CommunicationTrigger.ExpectedValue = "B";
+            var ambiguous = TcpFlowRouteEvaluator.Evaluate(flows, channel, "{\"Command\":\"Trigger\",\"Camera\":\"B\",\"TaskId\":\"SN-003\"}", "connection-3");
+            if (ambiguous.Count(x => x.Matched) != 2)
+                throw new InvalidOperationException("Ambiguous shared TCP routes were not detected by the evaluator.");
+            Console.WriteLine("PASS TCP/IP shared-server multi-flow routing");
+        }
+
+        private static void TestTcpFlowDispatcherEndToEnd()
+        {
+            var probe = new TcpListener(IPAddress.Loopback, 0);
+            probe.Start(); var port = ((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
+            using (var visionMaster = new FakeVisionMaster())
+            using (var visionPro = new FakeVisionPro())
+            using (var halcon = new FakeHalcon())
+            using (var cameras = new CameraRegistry())
+            using (var serverRegistry = new CommunicationRegistry())
+            using (var clientRegistry = new CommunicationRegistry())
+            {
+                var model = new MainViewModel(visionMaster, visionPro, halcon, cameras, serverRegistry);
+                var server = model.Communications[0];
+                server.Name = "GLOBAL_TCP_SERVER_E2E"; server.Protocol = "TCP/IP Server"; server.Host = "127.0.0.1"; server.Port = port;
+                server.FrameMode = "Terminator"; server.ReceiveTerminator = "\\r\\n"; server.SendTerminator = "\\r\\n"; server.PayloadFormat = "Json";
+                var client = new CommunicationDefinition
+                {
+                    Name = "GLOBAL_TCP_CLIENT_E2E", Protocol = "TCP/IP Client", Host = "127.0.0.1", Port = port,
+                    FrameMode = "Terminator", ReceiveTerminator = "\\r\\n", SendTerminator = "\\r\\n", PayloadFormat = "Json"
+                };
+
+                var flowA = model.StationFlows.First();
+                model.FlowName = "Camera A";
+                model.FlowSteps.Clear(); model.FlowSteps.Add(FlowNodeViewModel.Create("A 已运行", "LogNode", "数据", "Common", "Message", "A"));
+                model.TriggerChannel = server.Name; model.TriggerMode = "TextEquals"; model.TriggerMatchField = "Camera"; model.TriggerExpectedValue = "A"; model.TriggerPollIntervalMs = 20;
+                model.CommunicationTriggerFields.Clear();
+                model.CommunicationTriggerFields.Add(new CommunicationFieldExtractionViewModel { Name = "Command", Mode = "JsonPath", JsonPath = "Command" });
+                model.CommunicationTriggerFields.Add(new CommunicationFieldExtractionViewModel { Name = "Camera", Mode = "JsonPath", JsonPath = "Camera" });
+                model.CommunicationTriggerFields.Add(new CommunicationFieldExtractionViewModel { Name = "TaskId", Mode = "JsonPath", JsonPath = "TaskId" });
+                model.CommitProjectStructure();
+                flowA = model.StationFlows.First();
+                var flowB = new StationRecipeFlowDefinition
+                {
+                    StationName = flowA.StationName, RecipeName = flowA.RecipeName, FlowId = "Camera_B", FlowName = "Camera B", Enabled = true,
+                    Flow = new FlowDocument
+                    {
+                        ProjectName = model.ProjectName, StationName = flowA.StationName, RecipeName = flowA.RecipeName, FlowName = "Camera B",
+                        Nodes = new List<FlowNodeConfig> { FlowNodeViewModel.Create("B 已运行", "LogNode", "数据", "Common", "Message", "B").ToConfig() },
+                        CommunicationTrigger = CreateCameraRouteTrigger(server.Name, "B")
+                    }
+                };
+                model.StationFlows.Add(flowB);
+
+                model.RunCommunicationTriggerCommand.Execute(null);
+                WaitUntil(() => model.IsCommunicationTriggerRunning, 3000, "TCP dispatcher did not enter armed state.");
+                var connected = clientRegistry.TestConnection(client);
+                if (!connected.Success) throw new InvalidOperationException("TCP dispatcher test client failed to connect: " + connected.Message);
+                var sent = clientRegistry.WriteRawText(client, "{\"Command\":\"Trigger\",\"Camera\":\"B\",\"TaskId\":\"SN-E2E-002\"}");
+                if (!sent.Success) throw new InvalidOperationException("TCP dispatcher test trigger failed to send: " + sent.Message);
+                WaitUntil(() => string.Equals(model.FlowName, "Camera B", StringComparison.Ordinal) && model.Logs.Any(x => x.Message.Contains("B 已运行")), 5000, "Shared TCP dispatcher did not run Camera B flow.");
+                model.StopCommand.Execute(null);
+                WaitUntil(() => !model.IsCommunicationTriggerRunning && !model.IsBusy, 3000, "TCP dispatcher did not stop cleanly.");
+            }
+            Console.WriteLine("PASS TCP/IP shared-server dispatcher end to end");
+        }
+
+        private static CommunicationTriggerDefinition CreateCameraRouteTrigger(string channel, string camera)
+        {
+            return new CommunicationTriggerDefinition
+            {
+                Channel = channel, Mode = "TextEquals", MatchField = "Camera", ExpectedValue = camera, PollIntervalMs = 20,
+                Fields = new List<CommunicationFieldExtractionDefinition>
+                {
+                    new CommunicationFieldExtractionDefinition { Name = "Command", Mode = "JsonPath", JsonPath = "Command" },
+                    new CommunicationFieldExtractionDefinition { Name = "Camera", Mode = "JsonPath", JsonPath = "Camera" },
+                    new CommunicationFieldExtractionDefinition { Name = "TaskId", Mode = "JsonPath", JsonPath = "TaskId" }
+                }
+            };
+        }
+
+        private static void WaitUntil(Func<bool> condition, int timeoutMs, string error)
+        {
+            var watch = Stopwatch.StartNew();
+            while (!condition())
+            {
+                if (watch.ElapsedMilliseconds >= timeoutMs) throw new TimeoutException(error);
+                Thread.Sleep(20);
+            }
+        }
+
+        private static void TestTcpTextRoundTrip()
+        {
+            var probe = new TcpListener(IPAddress.Loopback, 0);
+            probe.Start();
+            var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+            probe.Stop();
+            var serverConfig = new CommunicationDefinition { Name = "TCP_SERVER_TEST", Protocol = "TCP/IP Server", Host = "127.0.0.1", Port = port, TextEncoding = "UTF-8", FieldSeparator = "|", SendTerminator = "<RESULT_END>", ReceiveTerminator = "<REQUEST_END>" };
+            var clientConfig = new CommunicationDefinition { Name = "TCP_CLIENT_TEST", Protocol = "TCP/IP Client", Host = "127.0.0.1", Port = port, TextEncoding = "UTF-8", FieldSeparator = "|", SendTerminator = "<REQUEST_END>", ReceiveTerminator = "<RESULT_END>" };
+            using (var server = new CommunicationRegistry())
+            using (var client = new CommunicationRegistry())
+            {
+                var serverStart = server.TestConnection(serverConfig);
+                if (!serverStart.Success) throw new InvalidOperationException("TCP server start failed: " + serverStart.Message);
+                var clientStart = client.TestConnection(clientConfig);
+                if (!clientStart.Success) throw new InvalidOperationException("TCP client connect failed: " + clientStart.Message);
+                var triggerSend = client.WriteCombined(clientConfig, new[]
+                {
+                    new CommunicationTextField { DataType = "String", Value = "RUN" },
+                    new CommunicationTextField { DataType = "String", Value = "SN001" },
+                    new CommunicationTextField { DataType = "String", Value = "MODEL-A" }
+                });
+                if (!triggerSend.Success) throw new InvalidOperationException("TCP client send failed: " + triggerSend.Message);
+                var receivedTrigger = WaitForTcpMessage(server, serverConfig, 3000);
+                if (!string.Equals(receivedTrigger, "RUN|SN001|MODEL-A", StringComparison.Ordinal)) throw new InvalidOperationException("TCP server received unexpected message: " + receivedTrigger);
+                var fields = CommunicationRegistry.ExtractTextFields(receivedTrigger, serverConfig.FieldSeparator, new[]
+                {
+                    new CommunicationFieldExtractionDefinition { Name = "Command", Mode = "Delimited", FieldIndex = 0 },
+                    new CommunicationFieldExtractionDefinition { Name = "SerialNumber", Mode = "Delimited", FieldIndex = 1 },
+                    new CommunicationFieldExtractionDefinition { Name = "Model", Mode = "Position", Start = 10, Length = 7 }
+                });
+                if (fields["Command"] != "RUN" || fields["SerialNumber"] != "SN001" || fields["Model"] != "MODEL-A")
+                    throw new InvalidOperationException("TCP field extraction returned unexpected values.");
+                var resultSend = server.WriteCombined(serverConfig, new[]
+                {
+                    new CommunicationTextField { Template = "RESULT:{Value}", DataType = "Bool", Value = true },
+                    new CommunicationTextField { Template = "SN:{Value}", DataType = "String", Value = fields["SerialNumber"] },
+                    new CommunicationTextField { Template = "SCORE:{Value}", DataType = "Double", Value = 98.5 }
+                });
+                if (!resultSend.Success) throw new InvalidOperationException("TCP server send failed: " + resultSend.Message);
+                var receivedResult = WaitForTcpMessage(client, clientConfig, 3000);
+                if (!string.Equals(receivedResult, "RESULT:True|SN:SN001|SCORE:98.5", StringComparison.Ordinal)) throw new InvalidOperationException("TCP client received unexpected message: " + receivedResult);
+            }
+            Console.WriteLine("PASS TCP/IP text client/server round trip");
+        }
+
+        private static void TestTcpLengthPrefixedJsonRoundTrip()
+        {
+            var probe = new TcpListener(IPAddress.Loopback, 0);
+            probe.Start(); var port = ((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
+            var serverConfig = new CommunicationDefinition
+            {
+                Name = "TCP_JSON_SERVER_TEST", Protocol = "TCP/IP Server", Host = "127.0.0.1", Port = port,
+                TextEncoding = "UTF-8", FrameMode = "LengthPrefix", LengthPrefixBytes = 4, LengthByteOrder = "BigEndian",
+                MaxFrameBytes = 1024 * 1024, PayloadFormat = "Json",
+                AutoResponses = new List<CommunicationAutoResponseDefinition>
+                {
+                    new CommunicationAutoResponseDefinition { MatchPath = "Command", ExpectedValue = "Heartbeat", ResponseTemplate = "{\"CmdId\":{{CmdId}},\"Command\":\"HeartbeatAck\"}", ConsumeMessage = true }
+                }
+            };
+            var clientConfig = new CommunicationDefinition
+            {
+                Name = "TCP_JSON_CLIENT_TEST", Protocol = "TCP/IP Client", Host = "127.0.0.1", Port = port,
+                TextEncoding = "UTF-8", FrameMode = "LengthPrefix", LengthPrefixBytes = 4, LengthByteOrder = "BigEndian",
+                MaxFrameBytes = 1024 * 1024, PayloadFormat = "Json"
+            };
+            using (var server = new CommunicationRegistry())
+            using (var client = new CommunicationRegistry())
+            {
+                if (!server.TestConnection(serverConfig).Success) throw new InvalidOperationException("TCP JSON server start failed.");
+                if (!client.TestConnection(clientConfig).Success) throw new InvalidOperationException("TCP JSON client connect failed.");
+
+                var heartbeat = client.WriteRawText(clientConfig, "{\"CmdId\":1742345678903,\"Command\":\"Heartbeat\"}");
+                if (!heartbeat.Success) throw new InvalidOperationException("Heartbeat send failed: " + heartbeat.Message);
+                var heartbeatAck = WaitForTcpMessage(client, clientConfig, 3000);
+                object heartbeatCommand; object heartbeatCmdId;
+                if (!CommunicationRegistry.TryGetJsonPathValue(heartbeatAck, "Command", out heartbeatCommand) || Convert.ToString(heartbeatCommand) != "HeartbeatAck" || !CommunicationRegistry.TryGetJsonPathValue(heartbeatAck, "CmdId", out heartbeatCmdId) || Convert.ToInt64(heartbeatCmdId) != 1742345678903L)
+                    throw new InvalidOperationException("Heartbeat auto response mismatch: " + heartbeatAck);
+                Thread.Sleep(50);
+                if (server.ReceiveText(serverConfig).HasValue) throw new InvalidOperationException("Consumed heartbeat was incorrectly forwarded to workflow trigger queue.");
+
+                var request = "{\"CmdId\":1742345678901,\"Command\":\"Trigger\",\"Camera\":\"A\",\"TaskId\":\"SN20260812-001\",\"RecipeMode\":1}";
+                if (!client.WriteRawText(clientConfig, request).Success) throw new InvalidOperationException("Trigger JSON send failed.");
+                var received = WaitForTcpMessage(server, serverConfig, 3000);
+                var extracted = CommunicationRegistry.ExtractTextFields(received, "|", new[]
+                {
+                    new CommunicationFieldExtractionDefinition { Name = "CmdId", Mode = "JsonPath", JsonPath = "CmdId" },
+                    new CommunicationFieldExtractionDefinition { Name = "Command", Mode = "JsonPath", JsonPath = "Command" },
+                    new CommunicationFieldExtractionDefinition { Name = "TaskId", Mode = "JsonPath", JsonPath = "TaskId" },
+                    new CommunicationFieldExtractionDefinition { Name = "RecipeMode", Mode = "JsonPath", JsonPath = "RecipeMode", Optional = true }
+                });
+                if (extracted["Command"] != "Trigger" || extracted["TaskId"] != "SN20260812-001" || extracted["CmdId"] != "1742345678901" || extracted["RecipeMode"] != "1")
+                    throw new InvalidOperationException("JSON path extraction mismatch.");
+                var optional = CommunicationRegistry.ExtractTextFields("{\"Command\":\"Trigger\"}", "|", new[] { new CommunicationFieldExtractionDefinition { Name = "RecipeMode", Mode = "JsonPath", JsonPath = "RecipeMode", Optional = true } });
+                if (optional["RecipeMode"] != string.Empty) throw new InvalidOperationException("Optional JSON path extraction mismatch.");
+
+                var response = server.WriteJson(serverConfig, new[]
+                {
+                    new CommunicationJsonField { Path = "CmdId", DataType = "Int64", Value = extracted["CmdId"] },
+                    new CommunicationJsonField { Path = "Command", DataType = "String", Value = "TriggerResult" },
+                    new CommunicationJsonField { Path = "Camera", DataType = "String", Value = "A" },
+                    new CommunicationJsonField { Path = "Result", DataType = "Int32", Value = 0 },
+                    new CommunicationJsonField { Path = "ErrorCode", DataType = "Int32", Value = 0 },
+                    new CommunicationJsonField { Path = "TimeStamp", DataType = "String", Value = "2026-08-12T15:31:20.123Z" },
+                    new CommunicationJsonField { Path = "Data.Trajectory", DataType = "Json", Value = "[{\"X\":120.345,\"Y\":45.678},{\"X\":121.234,\"Y\":46.123},{\"X\":122.567,\"Y\":47.890}]" },
+                    new CommunicationJsonField { Path = "Data.PointCount", DataType = "Int32", Value = 3 }
+                });
+                if (!response.Success) throw new InvalidOperationException("TriggerResult JSON send failed: " + response.Message);
+                var resultJson = WaitForTcpMessage(client, clientConfig, 3000);
+                object pointCount; object thirdX; object command;
+                if (!CommunicationRegistry.TryGetJsonPathValue(resultJson, "Command", out command) || Convert.ToString(command) != "TriggerResult" || !CommunicationRegistry.TryGetJsonPathValue(resultJson, "Data.PointCount", out pointCount) || Convert.ToInt32(pointCount) != 3 || !CommunicationRegistry.TryGetJsonPathValue(resultJson, "Data.Trajectory[2].X", out thirdX) || Math.Abs(Convert.ToDouble(thirdX) - 122.567) > 0.0001)
+                    throw new InvalidOperationException("Nested JSON result mismatch: " + resultJson);
+
+                using (var rawClient = new TcpClient())
+                {
+                    rawClient.NoDelay = true; rawClient.Connect(IPAddress.Loopback, port);
+                    var first = BuildLengthPrefixedUtf8("{\"CmdId\":2,\"Command\":\"Trigger\",\"TaskId\":\"中文序列号\"}");
+                    var second = BuildLengthPrefixedUtf8("{\"CmdId\":3,\"Command\":\"Trigger\",\"TaskId\":\"SN-003\"}");
+                    var network = rawClient.GetStream();
+                    network.Write(first, 0, 2); network.Flush(); Thread.Sleep(25);
+                    var tailAndNext = new byte[first.Length - 2 + second.Length];
+                    Buffer.BlockCopy(first, 2, tailAndNext, 0, first.Length - 2); Buffer.BlockCopy(second, 0, tailAndNext, first.Length - 2, second.Length);
+                    network.Write(tailAndNext, 0, tailAndNext.Length); network.Flush();
+                    var fragmented = WaitForTcpMessage(server, serverConfig, 3000);
+                    var coalesced = WaitForTcpMessage(server, serverConfig, 3000);
+                    object unicodeTask; object secondCmdId;
+                    if (!CommunicationRegistry.TryGetJsonPathValue(fragmented, "TaskId", out unicodeTask) || Convert.ToString(unicodeTask) != "中文序列号" || !CommunicationRegistry.TryGetJsonPathValue(coalesced, "CmdId", out secondCmdId) || Convert.ToInt32(secondCmdId) != 3)
+                        throw new InvalidOperationException("Length-prefix fragmented/coalesced framing mismatch.");
+                }
+            }
+            Console.WriteLine("PASS TCP/IP 4-byte big-endian length-prefix JSON + JSONPath + auto response");
+        }
+
+        private static byte[] BuildLengthPrefixedUtf8(string text)
+        {
+            var body = System.Text.Encoding.UTF8.GetBytes(text ?? string.Empty);
+            var frame = new byte[4 + body.Length];
+            frame[0] = (byte)((body.Length >> 24) & 0xFF); frame[1] = (byte)((body.Length >> 16) & 0xFF); frame[2] = (byte)((body.Length >> 8) & 0xFF); frame[3] = (byte)(body.Length & 0xFF);
+            Buffer.BlockCopy(body, 0, frame, 4, body.Length); return frame;
+        }
+
+        private static string WaitForTcpMessage(CommunicationRegistry registry, CommunicationDefinition config, int timeoutMs)
+        {
+            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (DateTime.UtcNow < deadline)
+            {
+                var result = registry.ReceiveText(config);
+                if (!result.Success) throw new InvalidOperationException(result.Message);
+                if (result.HasValue) return Convert.ToString(result.Value);
+                Thread.Sleep(20);
+            }
+            throw new TimeoutException("Timed out waiting for TCP/IP message on " + config.Name);
         }
 
         private static int TestVisionMasterImage(string[] args)

@@ -34,7 +34,7 @@ namespace VisionFlowStudio.App
             Define("VisionMasterProcedureNode", "VisionMaster 流程", "算法", "VisionMaster", "运行 VisionMaster Solution 中的流程", "SolutionPath","","ProcedureName","流程1","ImagePath","","ImageSourceKey","CameraImagePath","ImageInputName","InputImage","OkOutputName","IsOK"),
             Define("VisionProToolBlockNode", "VisionPro ToolBlock", "算法", "VisionPro", "加载并运行 CogToolBlock VPP", "ToolBlockPath","","ImagePath","","ImageSourceKey","CameraImagePath","ImageInputName","InputImage","OkOutputName","IsOK"),
             Define("HalconProcedureNode", "HALCON Procedure", "算法", "HALCON", "通过 HDevEngine 运行 external procedure", "ProcedurePath","","ImagePath","","ImageSourceKey","CameraImagePath","ImageInputName","Image","OkOutputName","IsOK"),
-            Define("CommunicationWriteNode", "工业协议写入", "通讯", "Communication", "通过 HslCommunication 将视觉节点数据写入 PLC", "Channel","PLC_01","Address","DB1.0","SourceKey","","DataType","Bool"),
+            Define("CommunicationWriteNode", "通信结果写入", "通讯", "Communication", "将流程结果写入 PLC 地址或通过 TCP/IP 客户端/服务器发送文本", "Channel","PLC_01","Address","DB1.0","SourceKey","","DataType","Bool"),
             Define("CSharpScriptNode", "C# 高级脚本", "脚本", "CSharp", "使用 Roslyn 执行 C# 脚本，可读取任意前序节点输入输出并加载外部 DLL",
                 "ScriptFile","", "References","", "Imports","System;System.Linq;System.Collections.Generic", "OutputNames","Result;IsOK",
                 "Code",CSharpScriptEngine.DefaultClassTemplate),

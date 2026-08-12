@@ -28,6 +28,7 @@ namespace VisionFlowStudio.App
         private readonly CSharpScriptEngine _scriptEngine = new CSharpScriptEngine();
         private FlowNodeViewModel _selectedNode;
         private CommunicationWriteItemViewModel _selectedCommunicationWrite;
+        private CommunicationFieldExtractionViewModel _selectedTriggerField;
         private ImageViewDocumentViewModel _selectedImageDocument;
         private bool _loadingCommunicationWrites;
         private bool _refreshingRouteChoices;
@@ -63,6 +64,10 @@ namespace VisionFlowStudio.App
         private string _triggerDataType = "Bool";
         private string _triggerMode = "RisingEdge";
         private string _triggerExpectedValue = "True";
+        private string _triggerMatchField = string.Empty;
+        private string _recipeSwitchCommandField = string.Empty;
+        private string _recipeSwitchCommandValue = "SetMode";
+        private string _recipeSwitchValueField = string.Empty;
         private int _triggerPollIntervalMs = 100;
         private bool _isContinuousRunning;
         private bool _isCommunicationTriggerRunning;
@@ -82,6 +87,7 @@ namespace VisionFlowStudio.App
             _halcon = halcon;
             _cameras = cameras;
             _communications = communications;
+            _communications.RuntimeValueProvider = ResolveCommunicationRuntimeValue;
             Procedures = new ObservableCollection<string>();
             FlowSteps = new ObservableCollection<FlowNodeViewModel>();
             Logs = new ObservableCollection<LogEntryViewModel>();
@@ -91,6 +97,7 @@ namespace VisionFlowStudio.App
             Cameras = new ObservableCollection<CameraDefinition> { new CameraDefinition() };
             Communications = new ObservableCollection<CommunicationDefinition> { new CommunicationDefinition() };
             CommunicationWrites = new ObservableCollection<CommunicationWriteItemViewModel>();
+            CommunicationTriggerFields = new ObservableCollection<CommunicationFieldExtractionViewModel>();
             ImageDocuments = new ObservableCollection<ImageViewDocumentViewModel>();
             ProjectTree = new ObservableCollection<ProjectTreeNodeViewModel>();
             AvailableNodeTypes = new ObservableCollection<string>(NodeCatalog.All.Select(x => x.NodeType));
@@ -98,7 +105,9 @@ namespace VisionFlowStudio.App
             AvailableImageSources = new ObservableCollection<string>(); AvailableDataSources = new ObservableCollection<string>(); AvailableJudgeDataSources = new ObservableCollection<string>();
             AvailableCommunicationChannels = new ObservableCollection<string>(); AvailableCommunicationDataTypes = new ObservableCollection<string>(CommunicationRegistry.DataTypes);
             AvailableTriggerDataTypes = new ObservableCollection<string>(new[] { "Bool", "Byte", "Int16", "UInt16", "Int32", "UInt32", "Int64", "UInt64", "Float", "Double", "String" });
-            AvailableTriggerModes = new ObservableCollection<string>(new[] { "RisingEdge", "ValueEquals", "AnyChange" });
+            AvailableTriggerModes = new ObservableCollection<string>(new[] { "RisingEdge", "ValueEquals", "AnyChange", "TextEquals", "TextContains" });
+            AvailableCommunicationFieldModes = new ObservableCollection<string>(new[] { "Delimited", "Position", "JsonPath" });
+            AvailableTriggerMatchFields = new ObservableCollection<string>(new[] { string.Empty });
 
             LoadSolutionCommand = new AsyncRelayCommand(LoadSolutionAsync, CanUseVisionMaster);
             RunCommand = new AsyncRelayCommand(RunVisionMasterAsync, CanRunVisionMaster);
@@ -150,6 +159,7 @@ namespace VisionFlowStudio.App
         public ObservableCollection<CameraDefinition> Cameras { get; private set; }
         public ObservableCollection<CommunicationDefinition> Communications { get; private set; }
         public ObservableCollection<CommunicationWriteItemViewModel> CommunicationWrites { get; private set; }
+        public ObservableCollection<CommunicationFieldExtractionViewModel> CommunicationTriggerFields { get; private set; }
         public ObservableCollection<ImageViewDocumentViewModel> ImageDocuments { get; private set; }
         public ObservableCollection<ProjectTreeNodeViewModel> ProjectTree { get; private set; }
         public CameraRegistry CameraRegistry { get { return _cameras; } }
@@ -199,8 +209,11 @@ namespace VisionFlowStudio.App
         public ObservableCollection<string> AvailableCommunicationDataTypes { get; private set; }
         public ObservableCollection<string> AvailableTriggerDataTypes { get; private set; }
         public ObservableCollection<string> AvailableTriggerModes { get; private set; }
+        public ObservableCollection<string> AvailableCommunicationFieldModes { get; private set; }
+        public ObservableCollection<string> AvailableTriggerMatchFields { get; private set; }
         public CommunicationRegistry CommunicationRegistry { get { return _communications; } }
         public CommunicationWriteItemViewModel SelectedCommunicationWrite { get { return _selectedCommunicationWrite; } set { Set(ref _selectedCommunicationWrite, value); } }
+        public CommunicationFieldExtractionViewModel SelectedTriggerField { get { return _selectedTriggerField; } set { Set(ref _selectedTriggerField, value); } }
         public ImageViewDocumentViewModel SelectedImageDocument
         {
             get { return _selectedImageDocument; }
@@ -271,12 +284,37 @@ namespace VisionFlowStudio.App
         public string CommunicationSourceKey { get { return _communicationSourceKey; } set { if (Set(ref _communicationSourceKey, value)) SetSelectedParameterFor("CommunicationWriteNode", "SourceKey", value); } }
         public string CommunicationDataType { get { return _communicationDataType; } set { if (Set(ref _communicationDataType, value)) SetSelectedParameterFor("CommunicationWriteNode", "DataType", value); } }
         public int ContinuousIntervalMs { get { return _continuousIntervalMs; } set { Set(ref _continuousIntervalMs, Math.Max(0, value)); } }
-        public string TriggerChannel { get { return _triggerChannel; } set { Set(ref _triggerChannel, value); } }
+        public string TriggerChannel
+        {
+            get { return _triggerChannel; }
+            set
+            {
+                if (!Set(ref _triggerChannel, value)) return;
+                RefreshCommunicationTriggerUi(true);
+            }
+        }
         public string TriggerAddress { get { return _triggerAddress; } set { Set(ref _triggerAddress, value); } }
         public string TriggerDataType { get { return _triggerDataType; } set { Set(ref _triggerDataType, value); } }
         public string TriggerMode { get { return _triggerMode; } set { Set(ref _triggerMode, value); } }
         public string TriggerExpectedValue { get { return _triggerExpectedValue; } set { Set(ref _triggerExpectedValue, value); } }
+        public string TriggerMatchField { get { return _triggerMatchField; } set { Set(ref _triggerMatchField, value ?? string.Empty); } }
+        public string RecipeSwitchCommandField { get { return _recipeSwitchCommandField; } set { Set(ref _recipeSwitchCommandField, value ?? string.Empty); } }
+        public string RecipeSwitchCommandValue { get { return _recipeSwitchCommandValue; } set { Set(ref _recipeSwitchCommandValue, value ?? string.Empty); } }
+        public string RecipeSwitchValueField { get { return _recipeSwitchValueField; } set { Set(ref _recipeSwitchValueField, value ?? string.Empty); } }
         public int TriggerPollIntervalMs { get { return _triggerPollIntervalMs; } set { Set(ref _triggerPollIntervalMs, Math.Max(20, value)); } }
+        public bool IsTcpTriggerChannel
+        {
+            get
+            {
+                var channel = Communications == null ? null : Communications.FirstOrDefault(x => string.Equals(x.Name, TriggerChannel, StringComparison.OrdinalIgnoreCase));
+                return channel != null && CommunicationRegistry.IsTcpProtocol(channel.Protocol);
+            }
+        }
+        public bool IsPlcTriggerChannel { get { return !IsTcpTriggerChannel; } }
+        public string TriggerAddressLabel { get { return IsTcpTriggerChannel ? "读取地址（TCP不使用）" : "读取地址"; } }
+        public string TriggerDataTypeLabel { get { return IsTcpTriggerChannel ? "数据类型（TCP固定文本）" : "数据类型"; } }
+        public string TriggerExpectedValueLabel { get { return IsTcpTriggerChannel ? "指定字符串" : "目标值"; } }
+        public string TriggerHelpText { get { return IsTcpTriggerChannel ? "每个流程可配置独立的匹配字段和值；启动后，共享 TCP 通道会在当前型号的所有已启用流程中路由。TextEquals：字段完全相等；TextContains：字段包含指定值。" : "RisingEdge：0→非0；ValueEquals：进入目标值时触发；AnyChange：数值变化时触发。"; } }
         public bool IsContinuousRunning { get { return _isContinuousRunning; } private set { Set(ref _isContinuousRunning, value); } }
         public bool IsCommunicationTriggerRunning { get { return _isCommunicationTriggerRunning; } private set { Set(ref _isCommunicationTriggerRunning, value); } }
         public string PlatformMessage { get { return _platformMessage; } private set { if (Set(ref _platformMessage, value)) OnPropertyChanged("PlatformMessageDisplay"); } }
@@ -697,7 +735,20 @@ namespace VisionFlowStudio.App
 
         public void CommitProjectStructure()
         {
-            CaptureCurrentStationFlow(); NormalizeProjectStructure(); RefreshImageDocuments(); RefreshProjectTree();
+            CaptureCurrentStationFlow(); NormalizeProjectStructure(); RefreshImageDocuments(); RefreshProjectTree(); RefreshCommunicationTriggerUi(true);
+        }
+
+        private void RefreshCommunicationTriggerUi(bool normalizeMode)
+        {
+            if (normalizeMode)
+            {
+                if (IsTcpTriggerChannel && !string.Equals(TriggerMode, "TextEquals", StringComparison.OrdinalIgnoreCase) && !string.Equals(TriggerMode, "TextContains", StringComparison.OrdinalIgnoreCase))
+                    TriggerMode = "TextEquals";
+                else if (!IsTcpTriggerChannel && (string.Equals(TriggerMode, "TextEquals", StringComparison.OrdinalIgnoreCase) || string.Equals(TriggerMode, "TextContains", StringComparison.OrdinalIgnoreCase)))
+                    TriggerMode = "ValueEquals";
+            }
+            OnPropertyChanged("IsTcpTriggerChannel"); OnPropertyChanged("IsPlcTriggerChannel");
+            OnPropertyChanged("TriggerAddressLabel"); OnPropertyChanged("TriggerDataTypeLabel"); OnPropertyChanged("TriggerExpectedValueLabel"); OnPropertyChanged("TriggerHelpText");
         }
 
         public void RefreshProjectTree(bool refreshRouteChoices = true)
@@ -918,7 +969,9 @@ namespace VisionFlowStudio.App
                 CommunicationTrigger = new CommunicationTriggerDefinition
                 {
                     Channel = TriggerChannel ?? string.Empty, Address = TriggerAddress ?? string.Empty, DataType = TriggerDataType ?? "Bool",
-                    Mode = TriggerMode ?? "RisingEdge", ExpectedValue = TriggerExpectedValue ?? "True", PollIntervalMs = TriggerPollIntervalMs
+                    Mode = TriggerMode ?? "RisingEdge", ExpectedValue = TriggerExpectedValue ?? "True", MatchField = TriggerMatchField ?? string.Empty,
+                    RecipeSwitchCommandField = RecipeSwitchCommandField ?? string.Empty, RecipeSwitchCommandValue = RecipeSwitchCommandValue ?? "SetMode", RecipeSwitchValueField = RecipeSwitchValueField ?? string.Empty, PollIntervalMs = TriggerPollIntervalMs,
+                    Fields = CommunicationTriggerFields.Select(x => x.ToDefinition()).ToList()
                 }
             };
             foreach (var node in FlowSteps.ToArray()) document.Nodes.Add(node.ToConfig());
@@ -934,7 +987,13 @@ namespace VisionFlowStudio.App
             TriggerDataType = string.IsNullOrWhiteSpace(trigger.DataType) ? "Bool" : trigger.DataType;
             TriggerMode = string.IsNullOrWhiteSpace(trigger.Mode) ? "RisingEdge" : trigger.Mode;
             TriggerExpectedValue = trigger.ExpectedValue ?? "True";
+            TriggerMatchField = trigger.MatchField ?? string.Empty;
+            RecipeSwitchCommandField = trigger.RecipeSwitchCommandField ?? string.Empty;
+            RecipeSwitchCommandValue = trigger.RecipeSwitchCommandValue ?? "SetMode";
+            RecipeSwitchValueField = trigger.RecipeSwitchValueField ?? string.Empty;
             TriggerPollIntervalMs = trigger.PollIntervalMs <= 0 ? 100 : trigger.PollIntervalMs;
+            LoadCommunicationTriggerFields(trigger.Fields);
+            RefreshCommunicationTriggerUi(true);
         }
 
         private string NextFlowName(string stationName, string recipeName)
@@ -1302,35 +1361,153 @@ namespace VisionFlowStudio.App
         {
             if (!BeginRun()) return;
             IsCommunicationTriggerRunning = true;
-            object previous = null; var hasPrevious = false; var triggerLatched = false;
             try
             {
+                CaptureCurrentStationFlow();
                 var channel = Communications.FirstOrDefault(x => string.Equals(x.Name, TriggerChannel, StringComparison.OrdinalIgnoreCase));
                 if (channel == null) throw new InvalidOperationException("通信触发通道不存在：" + TriggerChannel);
-                RunState = "等待通讯触发"; ResultState = "ARMED"; ResultMessage = TriggerChannel + " / " + TriggerAddress;
-                while (!_runCancellation.IsCancellationRequested)
-                {
-                    var read = _communications.Read(channel, TriggerAddress, TriggerDataType);
-                    if (!read.Success)
-                    {
-                        RunState = "通讯触发读取失败"; ResultState = "ERROR"; ResultMessage = read.Message;
-                        AddLog("ERROR", "通讯触发：" + read.Message);
-                        await Task.Delay(Math.Max(TriggerPollIntervalMs, 200), _runCancellation.Token); continue;
-                    }
-                    var matched = IsTriggerMatched(read.Value, previous, hasPrevious, ref triggerLatched);
-                    previous = read.Value; hasPrevious = true;
-                    if (matched)
-                    {
-                        AddLog("TRIGGER", string.Format("{0}.{1}={2}，启动流程 {3}", TriggerChannel, TriggerAddress, Convert.ToString(read.Value, CultureInfo.InvariantCulture), FlowName));
-                        await RunFlowCoreAsync(0, FlowSteps.Count - 1, _runCancellation.Token);
-                        RunState = "等待通讯触发";
-                    }
-                    await Task.Delay(TriggerPollIntervalMs, _runCancellation.Token);
-                }
+                if (CommunicationRegistry.IsTcpProtocol(channel.Protocol))
+                    await RunTcpFlowDispatcherAsync(_runCancellation.Token);
+                else
+                    await RunPlcCommunicationTriggerAsync(channel, _runCancellation.Token);
             }
             catch (OperationCanceledException) { SetStoppedState(); }
             catch (Exception ex) { ResultState = "ERROR"; ResultMessage = ex.Message; RunState = "通讯触发失败"; AddLog("ERROR", ex.Message); }
             finally { IsCommunicationTriggerRunning = false; EndRun(); }
+        }
+
+        private async Task RunTcpFlowDispatcherAsync(CancellationToken token)
+        {
+            var routes = GetTcpFlowRoutesForRecipe(RecipeName);
+            if (routes.Count == 0) throw new InvalidOperationException("当前型号没有配置可用的 TCP/IP 流程触发路由：" + RecipeName);
+            SetTcpDispatcherWaitingState(routes);
+            while (!token.IsCancellationRequested)
+            {
+                routes = GetTcpFlowRoutesForRecipe(RecipeName);
+                if (routes.Count == 0) throw new InvalidOperationException("当前型号没有配置可用的 TCP/IP 流程触发路由：" + RecipeName);
+                var pollInterval = Math.Max(20, routes.Min(x => x.Flow.Flow.CommunicationTrigger.PollIntervalMs <= 0 ? 100 : x.Flow.Flow.CommunicationTrigger.PollIntervalMs));
+                foreach (var routeGroup in routes.GroupBy(x => x.Channel.Name, StringComparer.OrdinalIgnoreCase).ToArray())
+                {
+                    token.ThrowIfCancellationRequested();
+                    var channel = routeGroup.First().Channel;
+                    var read = _communications.ReceiveText(channel);
+                    if (!read.Success)
+                    {
+                        RunState = "通讯触发读取失败"; ResultState = "ERROR"; ResultMessage = read.Message;
+                        AddLog("ERROR", "通讯触发：" + read.Message);
+                        continue;
+                    }
+                    if (!read.HasValue) continue;
+                    await DispatchTcpFrameAsync(channel, read, routeGroup.Select(x => x.Flow).ToArray(), token);
+                    if (!token.IsCancellationRequested) SetTcpDispatcherWaitingState(GetTcpFlowRoutesForRecipe(RecipeName));
+                }
+                await Task.Delay(pollInterval, token);
+            }
+        }
+
+        private List<TcpFlowRoute> GetTcpFlowRoutesForRecipe(string recipeName)
+        {
+            var channels = Communications
+                .Where(x => x != null && x.Enabled && CommunicationRegistry.IsTcpProtocol(x.Protocol) && !string.IsNullOrWhiteSpace(x.Name))
+                .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+            return StationFlows
+                .Where(x => x != null && x.Enabled && string.Equals(x.RecipeName, recipeName, StringComparison.OrdinalIgnoreCase))
+                .Where(x => !Stations.Any(s => string.Equals(s.Name, x.StationName, StringComparison.OrdinalIgnoreCase) && !s.Enabled))
+                .Select(x => new { Flow = x, Trigger = x.Flow == null ? null : x.Flow.CommunicationTrigger })
+                .Where(x => x.Trigger != null && !string.IsNullOrWhiteSpace(x.Trigger.Channel) && channels.ContainsKey(x.Trigger.Channel))
+                .Select(x => new TcpFlowRoute { Flow = x.Flow, Channel = channels[x.Trigger.Channel] })
+                .ToList();
+        }
+
+        private void SetTcpDispatcherWaitingState(IReadOnlyCollection<TcpFlowRoute> routes)
+        {
+            RunState = "等待通讯触发"; ResultState = "ARMED";
+            ResultMessage = string.Format("型号 {0} / {1} 个流程 / {2} 个 TCP 通道待命", RecipeName, routes == null ? 0 : routes.Count, routes == null ? 0 : routes.Select(x => x.Channel.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        }
+
+        private async Task DispatchTcpFrameAsync(CommunicationDefinition channel, CommunicationOperationResult read, IEnumerable<StationRecipeFlowDefinition> flows, CancellationToken token)
+        {
+            var message = Convert.ToString(read.Value, CultureInfo.InvariantCulture) ?? string.Empty;
+            var evaluations = TcpFlowRouteEvaluator.Evaluate(flows, channel, message, read.ConnectionId);
+            foreach (var evaluation in evaluations.Where(x => !string.IsNullOrWhiteSpace(x.Error)))
+                AddLog("WARN", string.Format("TCP/IP 报文对流程 {0} 提取失败，已跳过：{1}", GetFlowRouteName(evaluation.Flow), evaluation.Error));
+
+            foreach (var evaluation in evaluations.Where(x => string.IsNullOrWhiteSpace(x.Error)))
+            {
+                var trigger = evaluation.Flow.Flow.CommunicationTrigger;
+                if (TryHandleRecipeSwitch(evaluation.TriggerData, trigger)) return;
+            }
+
+            var matches = evaluations.Where(x => string.IsNullOrWhiteSpace(x.Error) && x.Matched).ToList();
+            if (matches.Count == 0)
+            {
+                AddLog("INFO", string.Format("{0} 收到报文，但当前型号 {1} 没有匹配流程。", channel.Name, RecipeName));
+                return;
+            }
+            if (matches.Count > 1)
+            {
+                var names = string.Join("、", matches.Select(x => GetFlowRouteName(x.Flow)));
+                ResultState = "ERROR"; RunState = "通讯路由冲突"; ResultMessage = "一条报文匹配到多个流程：" + names;
+                AddLog("ERROR", ResultMessage + "。请为各流程设置不同的匹配字段/指定值，本次未执行。");
+                return;
+            }
+
+            var selected = matches[0];
+            ActivateStationFlow(selected.Flow, true);
+            AddLog("TRIGGER", string.Format("{0} 收到触发，字段值 \"{1}\"，启动 {2}", channel.Name, selected.MatchValue, GetFlowRouteName(selected.Flow)));
+            await RunFlowCoreAsync(0, FlowSteps.Count - 1, token, selected.TriggerData);
+        }
+
+        private async Task RunPlcCommunicationTriggerAsync(CommunicationDefinition channel, CancellationToken token)
+        {
+            object previous = null; var hasPrevious = false; var triggerLatched = false;
+            RunState = "等待通讯触发"; ResultState = "ARMED"; ResultMessage = TriggerChannel + " / " + TriggerAddress;
+            while (!token.IsCancellationRequested)
+            {
+                var read = _communications.Read(channel, TriggerAddress, TriggerDataType);
+                if (!read.Success)
+                {
+                    RunState = "通讯触发读取失败"; ResultState = "ERROR"; ResultMessage = read.Message;
+                    AddLog("ERROR", "通讯触发：" + read.Message);
+                    await Task.Delay(Math.Max(TriggerPollIntervalMs, 200), token); continue;
+                }
+                if (!read.HasValue) { await Task.Delay(TriggerPollIntervalMs, token); continue; }
+                var matched = IsTriggerMatched(read.Value, previous, hasPrevious, ref triggerLatched);
+                previous = read.Value; hasPrevious = true;
+                if (matched)
+                {
+                    AddLog("TRIGGER", string.Format("{0}.{1}={2}，启动流程 {3}", TriggerChannel, TriggerAddress, Convert.ToString(read.Value, CultureInfo.InvariantCulture), FlowName));
+                    await RunFlowCoreAsync(0, FlowSteps.Count - 1, token);
+                    RunState = "等待通讯触发";
+                }
+                await Task.Delay(TriggerPollIntervalMs, token);
+            }
+        }
+
+        private bool TryHandleRecipeSwitch(IDictionary<string, object> data, CommunicationTriggerDefinition trigger)
+        {
+            if (data == null || trigger == null || string.IsNullOrWhiteSpace(trigger.RecipeSwitchCommandField) || string.IsNullOrWhiteSpace(trigger.RecipeSwitchValueField)) return false;
+            object command; object requested;
+            if (!data.TryGetValue("CommunicationTrigger." + trigger.RecipeSwitchCommandField.Trim(), out command) || !string.Equals(Convert.ToString(command, CultureInfo.InvariantCulture), trigger.RecipeSwitchCommandValue ?? string.Empty, StringComparison.Ordinal)) return false;
+            if (!data.TryGetValue("CommunicationTrigger." + trigger.RecipeSwitchValueField.Trim(), out requested)) throw new InvalidOperationException("配方切换字段不存在：" + trigger.RecipeSwitchValueField);
+            var value = Convert.ToString(requested, CultureInfo.InvariantCulture) ?? string.Empty;
+            RecipeDefinition target = Recipes.FirstOrDefault(x => string.Equals(x.Name, value, StringComparison.OrdinalIgnoreCase) || string.Equals(x.ProductCode, value, StringComparison.OrdinalIgnoreCase));
+            int index;
+            if (target == null && int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out index) && index >= 0 && index < Recipes.Count) target = Recipes[index];
+            if (target == null) throw new InvalidOperationException("找不到配方/型号：" + value);
+            ActivateRecipe(target); AddLog("MODE", string.Format("收到 {0}，已切换配方/型号为 {1}", trigger.RecipeSwitchCommandValue, target.Name)); return true;
+        }
+
+        private static string GetFlowRouteName(StationRecipeFlowDefinition flow)
+        {
+            return flow == null ? "<未知流程>" : string.Format("{0} / {1} / {2}", flow.StationName, flow.RecipeName, flow.FlowName);
+        }
+
+        private sealed class TcpFlowRoute
+        {
+            public StationRecipeFlowDefinition Flow { get; set; }
+            public CommunicationDefinition Channel { get; set; }
         }
 
         private bool IsTriggerMatched(object current, object previous, bool hasPrevious, ref bool latched)
@@ -1367,15 +1544,18 @@ namespace VisionFlowStudio.App
         }
         private void SetStoppedState() { ResultState = "STOP"; ResultMessage = "流程已停止"; RunState = "已停止"; UpdateSelectedImageDocumentState(); }
 
-        private async Task RunFlowCoreAsync(int start, int end, CancellationToken token)
+        private async Task RunFlowCoreAsync(int start, int end, CancellationToken token, IDictionary<string, object> initialData = null)
         {
             if (start < 0 || end < start || end >= FlowSteps.Count) return;
             RunState = "流程运行中"; ResultState = "RUN";
             var total = Stopwatch.StartNew(); var context = new VisionContext { ProjectName = ProjectName, RecipeName = RecipeName, StationName = StationName }; var finalOk = true;
+            if (initialData != null) foreach (var pair in initialData) context.Set(pair.Key, pair.Value);
             for (var i = start; i <= end; i++)
             {
                 token.ThrowIfCancellationRequested(); var node = FlowSteps[i];
                 if (!node.Enabled) { node.ApplyResult(new NodeRunResult { Status = NodeRunStatus.Skipped, Message = "节点已禁用" }); continue; }
+                string skipReason;
+                if (!ShouldRunNode(node, context, out skipReason)) { node.ApplyResult(new NodeRunResult { Status = NodeRunStatus.Skipped, Message = skipReason }); continue; }
                 node.Status = "Running"; var result = await ExecuteNodeAsync(node, context, token); node.ApplyResult(result);
                 AddLog(result.Status.ToString().ToUpperInvariant(), node.NodeName + "：" + result.Message);
                 if (result.Status == NodeRunStatus.Ng) finalOk = false;
@@ -1414,9 +1594,10 @@ namespace VisionFlowStudio.App
                         var capturedPath = SaveCapturedFrame(bitmap, vendor);
                         node.SetParameter("LastImagePath", capturedPath);
                         var outputImageKey = node.Get("OutputImageKey", "CameraImage"); var outputPathKey = node.Get("OutputPathKey", "CameraImagePath");
-                        context.Set(outputImageKey, frame); context.Set(outputPathKey, capturedPath); context.Set("CameraFrame", frame); context.Set("ImagePath", capturedPath);
+                        var exposureTimeUtc = frame.Timestamp.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture);
+                        context.Set(outputImageKey, frame); context.Set(outputPathKey, capturedPath); context.Set("CameraFrame", frame); context.Set("ImagePath", capturedPath); context.Set("CameraExposureTime", frame.Timestamp); context.Set("CameraExposureTimeUtc", exposureTimeUtc);
                         result = Ok(string.Format("{0} 采图完成{3}，{1}×{2}", vendor, frame.Width, frame.Height, hardwareTrigger ? "（硬触发）" : string.Empty));
-                        result.Outputs["ImagePath"] = capturedPath; result.Outputs[outputPathKey] = capturedPath; result.Outputs[outputImageKey] = frame;
+                        result.Outputs["ImagePath"] = capturedPath; result.Outputs[outputPathKey] = capturedPath; result.Outputs[outputImageKey] = frame; result.Outputs["ExposureTime"] = frame.Timestamp; result.Outputs["ExposureTimeUtc"] = exposureTimeUtc;
                         break;
                     case "DelayNode":
                         var delay = node.GetInt("DelayMs", 100);
@@ -1472,20 +1653,36 @@ namespace VisionFlowStudio.App
                     case "CommunicationWriteNode":
                         var channelName = node.Get("Channel", CommunicationChannel); var channel = Communications.FirstOrDefault(x => string.Equals(x.Name, channelName, StringComparison.OrdinalIgnoreCase));
                         if (channel == null) throw new InvalidOperationException("通信通道不存在：" + channelName);
-                        var writeMessages = new List<string>(); var allWritesOk = true; var writeIndex = 0;
+                        var writeMessages = new List<string>(); var allWritesOk = true; var writeIndex = 0; var tcpFields = new List<CommunicationTextField>(); var jsonFields = new List<CommunicationJsonField>();
+                        var tcpJson = CommunicationRegistry.IsTcpProtocol(channel.Protocol) && string.Equals(channel.PayloadFormat, "Json", StringComparison.OrdinalIgnoreCase);
+                        var connectionId = Convert.ToString(context.GetValue("CommunicationTrigger.ConnectionId"), CultureInfo.InvariantCulture);
                         foreach (var mapping in ReadCommunicationWrites(node).Where(x => x.Enabled))
                         {
                             writeIndex++;
-                            var sourceValue = ResolveCommunicationSource(context, mapping.SourceKey);
+                            var sourceValue = ResolveCommunicationWriteValue(context, mapping);
                             if (sourceValue == null)
                             {
                                 allWritesOk = false; writeMessages.Add(string.Format("#{0} 流程数据不存在：{1}", writeIndex, mapping.SourceKey)); continue;
                             }
-                            var writeResult = _communications.Write(channel, mapping.Address, mapping.DataType, sourceValue);
-                            if (!writeResult.Success) allWritesOk = false;
-                            writeMessages.Add("#" + writeIndex + " " + writeResult.Message);
+                            if (CommunicationRegistry.IsTcpProtocol(channel.Protocol))
+                            {
+                                if (tcpJson) jsonFields.Add(new CommunicationJsonField { Path = mapping.Address, DataType = mapping.DataType, Value = sourceValue });
+                                else tcpFields.Add(new CommunicationTextField { Template = mapping.Address, DataType = mapping.DataType, Value = sourceValue });
+                            }
+                            else
+                            {
+                                var writeResult = _communications.Write(channel, mapping.Address, mapping.DataType, sourceValue);
+                                if (!writeResult.Success) allWritesOk = false;
+                                writeMessages.Add("#" + writeIndex + " " + writeResult.Message);
+                            }
                         }
                         if (writeIndex == 0) throw new InvalidOperationException("通讯节点没有启用的写入映射");
+                        if (CommunicationRegistry.IsTcpProtocol(channel.Protocol) && allWritesOk)
+                        {
+                            var writeResult = tcpJson ? _communications.WriteJson(channel, jsonFields, connectionId) : _communications.WriteCombined(channel, tcpFields, connectionId);
+                            if (!writeResult.Success) allWritesOk = false;
+                            writeMessages.Add(writeResult.Message);
+                        }
                         result = new NodeRunResult { Status = allWritesOk ? NodeRunStatus.Ok : NodeRunStatus.Error, Message = string.Join(" | ", writeMessages) };
                         break;
                     case "CSharpScriptNode":
@@ -1514,6 +1711,26 @@ namespace VisionFlowStudio.App
         }
 
         private static NodeRunResult Ok(string message) { return new NodeRunResult { Status = NodeRunStatus.Ok, Message = message }; }
+        private static bool ShouldRunNode(FlowNodeViewModel node, VisionContext context, out string reason)
+        {
+            reason = string.Empty;
+            var key = node.Get("RunWhenKey", string.Empty);
+            if (string.IsNullOrWhiteSpace(key)) return true;
+            var current = ResolveCommunicationSource(context, key);
+            var mode = node.Get("RunWhenMode", "Equals");
+            var expected = node.Get("RunWhenValue", string.Empty);
+            var actual = current == null ? string.Empty : Convert.ToString(current, CultureInfo.InvariantCulture);
+            bool run;
+            if (string.Equals(mode, "Exists", StringComparison.OrdinalIgnoreCase)) run = current != null;
+            else if (string.Equals(mode, "NotExists", StringComparison.OrdinalIgnoreCase)) run = current == null;
+            else if (string.Equals(mode, "NotEquals", StringComparison.OrdinalIgnoreCase)) run = !string.Equals(actual, expected, StringComparison.Ordinal);
+            else if (string.Equals(mode, "EqualsIgnoreCase", StringComparison.OrdinalIgnoreCase)) run = string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+            else if (string.Equals(mode, "Contains", StringComparison.OrdinalIgnoreCase)) run = actual.IndexOf(expected ?? string.Empty, StringComparison.Ordinal) >= 0;
+            else if (string.Equals(mode, "NotContains", StringComparison.OrdinalIgnoreCase)) run = actual.IndexOf(expected ?? string.Empty, StringComparison.Ordinal) < 0;
+            else run = string.Equals(actual, expected, StringComparison.Ordinal);
+            if (!run) reason = string.Format("条件未满足：{0} {1} {2}（当前 {3}）", key, mode, expected, current == null ? "<不存在>" : actual);
+            return run;
+        }
         private IEnumerable<ScriptToolSnapshot> CreateScriptToolSnapshots(VisionContext context)
         {
             foreach (var flowNode in FlowSteps)
@@ -1529,6 +1746,10 @@ namespace VisionFlowStudio.App
                 }
                 yield return snapshot;
             }
+            var communication = new ScriptToolSnapshot { Name = "CommunicationTrigger", NodeId = "CommunicationTrigger", NodeType = "CommunicationTrigger", Platform = "Communication" };
+            foreach (var pair in context.Data.Where(x => x.Key.StartsWith("CommunicationTrigger.", StringComparison.OrdinalIgnoreCase)))
+                communication.Outputs[pair.Key.Substring("CommunicationTrigger.".Length)] = pair.Value;
+            yield return communication;
         }
         private static object ResolveCommunicationSource(VisionContext context, string sourceKey)
         {
@@ -1536,6 +1757,26 @@ namespace VisionFlowStudio.App
             if (value != null) return value;
             var normalized = NormalizeDataSourceKey(sourceKey);
             return string.Equals(normalized, sourceKey, StringComparison.Ordinal) ? null : context.GetValue(normalized);
+        }
+        private static object ResolveCommunicationWriteValue(VisionContext context, CommunicationWriteItemViewModel mapping)
+        {
+            if (mapping == null) return null;
+            if (mapping.UseConstant) return mapping.ConstantValue ?? string.Empty;
+            if (string.Equals(mapping.SourceKey, "$Now", StringComparison.OrdinalIgnoreCase)) return DateTime.Now.ToString("o", CultureInfo.InvariantCulture);
+            if (string.Equals(mapping.SourceKey, "$UtcNow", StringComparison.OrdinalIgnoreCase)) return DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+            return ResolveCommunicationSource(context, mapping.SourceKey);
+        }
+        private object ResolveCommunicationRuntimeValue(string key)
+        {
+            var name = (key ?? string.Empty).Trim();
+            if (string.Equals(name, "Ready", StringComparison.OrdinalIgnoreCase)) return _runCancellation == null;
+            if (string.Equals(name, "Busy", StringComparison.OrdinalIgnoreCase)) return _runCancellation != null;
+            if (string.Equals(name, "ProjectName", StringComparison.OrdinalIgnoreCase)) return ProjectName;
+            if (string.Equals(name, "StationName", StringComparison.OrdinalIgnoreCase)) return StationName;
+            if (string.Equals(name, "RecipeName", StringComparison.OrdinalIgnoreCase)) return RecipeName;
+            if (string.Equals(name, "FlowName", StringComparison.OrdinalIgnoreCase)) return FlowName;
+            if (string.Equals(name, "ResultState", StringComparison.OrdinalIgnoreCase)) return ResultState;
+            return null;
         }
         private static string NormalizeDataSourceKey(string sourceKey)
         {
@@ -1647,8 +1888,46 @@ namespace VisionFlowStudio.App
         public void AddCommunicationWrite()
         {
             if (SelectedNode == null || SelectedNode.NodeType != "CommunicationWriteNode") return;
-            var item = CreateCommunicationWrite(true, "DB1.0", AvailableDataSources.FirstOrDefault() ?? string.Empty, "Bool");
+            var item = CreateCommunicationWrite(true, "DB1.0", AvailableDataSources.FirstOrDefault() ?? string.Empty, "Bool", false, string.Empty);
             CommunicationWrites.Add(item); SelectedCommunicationWrite = item; SaveCommunicationWrites();
+        }
+        public void AddCommunicationTriggerField()
+        {
+            var index = 1; string name;
+            do { name = "Field" + index.ToString("00", CultureInfo.InvariantCulture); index++; }
+            while (CommunicationTriggerFields.Any(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)));
+            var item = new CommunicationFieldExtractionViewModel { Name = name, Mode = "Delimited", FieldIndex = CommunicationTriggerFields.Count, Trim = true };
+            item.PropertyChanged += CommunicationTriggerFieldChanged;
+            CommunicationTriggerFields.Add(item); SelectedTriggerField = item; RefreshCommunicationTriggerFieldChoices();
+        }
+        public void RemoveSelectedCommunicationTriggerField()
+        {
+            if (SelectedTriggerField == null) return;
+            SelectedTriggerField.PropertyChanged -= CommunicationTriggerFieldChanged;
+            CommunicationTriggerFields.Remove(SelectedTriggerField);
+            SelectedTriggerField = CommunicationTriggerFields.FirstOrDefault(); RefreshCommunicationTriggerFieldChoices();
+        }
+        private void LoadCommunicationTriggerFields(IEnumerable<CommunicationFieldExtractionDefinition> definitions)
+        {
+            foreach (var old in CommunicationTriggerFields) old.PropertyChanged -= CommunicationTriggerFieldChanged;
+            CommunicationTriggerFields.Clear();
+            foreach (var definition in definitions ?? Enumerable.Empty<CommunicationFieldExtractionDefinition>())
+            {
+                var item = new CommunicationFieldExtractionViewModel(definition);
+                item.PropertyChanged += CommunicationTriggerFieldChanged;
+                CommunicationTriggerFields.Add(item);
+            }
+            SelectedTriggerField = CommunicationTriggerFields.FirstOrDefault(); RefreshCommunicationTriggerFieldChoices();
+        }
+        private void CommunicationTriggerFieldChanged(object sender, PropertyChangedEventArgs e) { RefreshCommunicationTriggerFieldChoices(); }
+        private void RefreshCommunicationTriggerFieldChoices()
+        {
+            var names = CommunicationTriggerFields.Where(x => !string.IsNullOrWhiteSpace(x.Name)).Select(x => x.Name.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            ReplaceItems(AvailableTriggerMatchFields, new[] { string.Empty }.Concat(names));
+            if (!string.IsNullOrWhiteSpace(TriggerMatchField) && !names.Any(x => string.Equals(x, TriggerMatchField, StringComparison.OrdinalIgnoreCase))) TriggerMatchField = string.Empty;
+            if (!string.IsNullOrWhiteSpace(RecipeSwitchCommandField) && !names.Any(x => string.Equals(x, RecipeSwitchCommandField, StringComparison.OrdinalIgnoreCase))) RecipeSwitchCommandField = string.Empty;
+            if (!string.IsNullOrWhiteSpace(RecipeSwitchValueField) && !names.Any(x => string.Equals(x, RecipeSwitchValueField, StringComparison.OrdinalIgnoreCase))) RecipeSwitchValueField = string.Empty;
+            RefreshRouteChoices();
         }
         private void EnsureCommunicationNodeDefaults(FlowNodeViewModel node)
         {
@@ -1668,12 +1947,12 @@ namespace VisionFlowStudio.App
             if (SelectedCommunicationWrite == null) return;
             SelectedCommunicationWrite.PropertyChanged -= CommunicationWriteChanged;
             CommunicationWrites.Remove(SelectedCommunicationWrite);
-            if (CommunicationWrites.Count == 0) CommunicationWrites.Add(CreateCommunicationWrite(true, "DB1.0", string.Empty, "Bool"));
+            if (CommunicationWrites.Count == 0) CommunicationWrites.Add(CreateCommunicationWrite(true, "DB1.0", string.Empty, "Bool", false, string.Empty));
             SelectedCommunicationWrite = CommunicationWrites.FirstOrDefault(); SaveCommunicationWrites();
         }
-        private CommunicationWriteItemViewModel CreateCommunicationWrite(bool enabled, string address, string sourceKey, string dataType)
+        private CommunicationWriteItemViewModel CreateCommunicationWrite(bool enabled, string address, string sourceKey, string dataType, bool useConstant, string constantValue)
         {
-            var item = new CommunicationWriteItemViewModel { Enabled = enabled, Address = address, SourceKey = ToDisplayDataSourceKey(sourceKey), DataType = dataType };
+            var item = new CommunicationWriteItemViewModel { Enabled = enabled, Address = address, SourceKey = ToDisplayDataSourceKey(sourceKey), DataType = dataType, UseConstant = useConstant, ConstantValue = constantValue };
             item.PropertyChanged += CommunicationWriteChanged; return item;
         }
         private string ToDisplayDataSourceKey(string sourceKey)
@@ -1697,11 +1976,11 @@ namespace VisionFlowStudio.App
                 if (count > 0)
                 {
                     for (var index = 0; index < count; index++)
-                        CommunicationWrites.Add(CreateCommunicationWrite(node.GetBool("Write" + index + ".Enabled", true), node.Get("Write" + index + ".Address", "DB1.0"), node.Get("Write" + index + ".SourceKey", string.Empty), node.Get("Write" + index + ".DataType", "Bool")));
+                        CommunicationWrites.Add(CreateCommunicationWrite(node.GetBool("Write" + index + ".Enabled", true), node.Get("Write" + index + ".Address", "DB1.0"), node.Get("Write" + index + ".SourceKey", string.Empty), node.Get("Write" + index + ".DataType", "Bool"), node.GetBool("Write" + index + ".UseConstant", false), node.Get("Write" + index + ".ConstantValue", string.Empty)));
                 }
                 else
                 {
-                    CommunicationWrites.Add(CreateCommunicationWrite(true, node.Get("Address", "DB1.0"), node.Get("SourceKey", string.Empty), node.Get("DataType", "Bool")));
+                    CommunicationWrites.Add(CreateCommunicationWrite(true, node.Get("Address", "DB1.0"), node.Get("SourceKey", string.Empty), node.Get("DataType", "Bool"), false, string.Empty));
                 }
                 SelectedCommunicationWrite = CommunicationWrites.FirstOrDefault();
             }
@@ -1719,6 +1998,8 @@ namespace VisionFlowStudio.App
                 SelectedNode.SetParameter(prefix + "Address", item.Address ?? string.Empty);
                 SelectedNode.SetParameter(prefix + "SourceKey", item.SourceKey ?? string.Empty);
                 SelectedNode.SetParameter(prefix + "DataType", item.DataType ?? "Bool");
+                SelectedNode.SetParameter(prefix + "UseConstant", item.UseConstant.ToString());
+                SelectedNode.SetParameter(prefix + "ConstantValue", item.ConstantValue ?? string.Empty);
             }
             var first = CommunicationWrites.FirstOrDefault();
             if (first != null)
@@ -1741,7 +2022,7 @@ namespace VisionFlowStudio.App
                 items.Add(new CommunicationWriteItemViewModel { Enabled = true, Address = node.Get("Address", "DB1.0"), SourceKey = node.Get("SourceKey", string.Empty), DataType = node.Get("DataType", "Bool") });
                 return items;
             }
-            for (var index = 0; index < count; index++) items.Add(new CommunicationWriteItemViewModel { Enabled = node.GetBool("Write" + index + ".Enabled", true), Address = node.Get("Write" + index + ".Address", "DB1.0"), SourceKey = node.Get("Write" + index + ".SourceKey", string.Empty), DataType = node.Get("Write" + index + ".DataType", "Bool") });
+            for (var index = 0; index < count; index++) items.Add(new CommunicationWriteItemViewModel { Enabled = node.GetBool("Write" + index + ".Enabled", true), Address = node.Get("Write" + index + ".Address", "DB1.0"), SourceKey = node.Get("Write" + index + ".SourceKey", string.Empty), DataType = node.Get("Write" + index + ".DataType", "Bool"), UseConstant = node.GetBool("Write" + index + ".UseConstant", false), ConstantValue = node.Get("Write" + index + ".ConstantValue", string.Empty) });
             return items;
         }
 
@@ -1777,7 +2058,7 @@ namespace VisionFlowStudio.App
                     IEnumerable<string> fixedOutputs = node.NodeType == "VisionMasterProcedureNode" ? new[] { "VisionMasterOK", "VisionMasterProcessTimeMs", "ProcedureName" }
                         : node.NodeType == "VisionProToolBlockNode" ? new[] { "VisionProOK", "VisionProRunStatus" }
                         : node.NodeType == "HalconProcedureNode" ? new[] { "HalconOK", "Procedure" }
-                        : node.NodeType == "CameraGrabNode" ? new[] { "ImagePath", node.Get("OutputPathKey", "CameraImagePath") }
+                        : node.NodeType == "CameraGrabNode" ? new[] { "ImagePath", node.Get("OutputPathKey", "CameraImagePath"), "ExposureTime", "ExposureTimeUtc" }
                         : node.NodeType == "CSharpScriptNode" ? CSharpScriptEngine.ParseList(node.Get("OutputNames", string.Empty)).ToArray()
                         : new string[0];
                     var outputs = new List<string>(fixedOutputs);
@@ -1814,6 +2095,11 @@ namespace VisionFlowStudio.App
                 ReplaceItems(AvailableDataSources, dataSources);
                 ReplaceItems(AvailableJudgeDataSources, judgeSources);
                 ReplaceItems(AvailableCommunicationChannels, Communications.ToArray().Select(x => x.Name));
+            foreach (var triggerKey in new[] { "CommunicationTrigger.Raw", "CommunicationTrigger.ConnectionId" }.Concat(CommunicationTriggerFields.Where(x => !string.IsNullOrWhiteSpace(x.Name)).Select(x => "CommunicationTrigger." + x.Name.Trim())))
+                {
+                    if (!AvailableDataSources.Any(x => string.Equals(x, triggerKey, StringComparison.OrdinalIgnoreCase))) AvailableDataSources.Add(triggerKey);
+                    if (!AvailableJudgeDataSources.Any(x => string.Equals(x, triggerKey, StringComparison.OrdinalIgnoreCase))) AvailableJudgeDataSources.Add(triggerKey);
+                }
             }
             finally { _refreshingRouteChoices = false; }
         }
@@ -1958,10 +2244,45 @@ namespace VisionFlowStudio.App
         private string _address = "DB1.0";
         private string _sourceKey = string.Empty;
         private string _dataType = "Bool";
+        private bool _useConstant;
+        private string _constantValue = string.Empty;
         public bool Enabled { get { return _enabled; } set { Set(ref _enabled, value); } }
         public string Address { get { return _address; } set { Set(ref _address, value); } }
         public string SourceKey { get { return _sourceKey; } set { Set(ref _sourceKey, value); } }
         public string DataType { get { return _dataType; } set { Set(ref _dataType, value); } }
+        public bool UseConstant { get { return _useConstant; } set { Set(ref _useConstant, value); } }
+        public string ConstantValue { get { return _constantValue; } set { Set(ref _constantValue, value); } }
+    }
+
+    public sealed class CommunicationFieldExtractionViewModel : ObservableObject
+    {
+        private string _name = "SerialNumber";
+        private string _mode = "Delimited";
+        private int _fieldIndex;
+        private int _start;
+        private int _length;
+        private string _jsonPath = string.Empty;
+        private bool _optional;
+        private bool _trim = true;
+        public CommunicationFieldExtractionViewModel() { }
+        public CommunicationFieldExtractionViewModel(CommunicationFieldExtractionDefinition definition)
+        {
+            if (definition == null) return;
+            _name = definition.Name ?? string.Empty; _mode = definition.Mode ?? "Delimited"; _fieldIndex = definition.FieldIndex;
+            _start = definition.Start; _length = definition.Length; _jsonPath = definition.JsonPath ?? string.Empty; _optional = definition.Optional; _trim = definition.Trim;
+        }
+        public string Name { get { return _name; } set { Set(ref _name, value); } }
+        public string Mode { get { return _mode; } set { Set(ref _mode, value); } }
+        public int FieldIndex { get { return _fieldIndex; } set { Set(ref _fieldIndex, Math.Max(0, value)); } }
+        public int Start { get { return _start; } set { Set(ref _start, Math.Max(0, value)); } }
+        public int Length { get { return _length; } set { Set(ref _length, Math.Max(0, value)); } }
+        public string JsonPath { get { return _jsonPath; } set { Set(ref _jsonPath, value); } }
+        public bool Optional { get { return _optional; } set { Set(ref _optional, value); } }
+        public bool Trim { get { return _trim; } set { Set(ref _trim, value); } }
+        public CommunicationFieldExtractionDefinition ToDefinition()
+        {
+            return new CommunicationFieldExtractionDefinition { Name = Name ?? string.Empty, Mode = Mode ?? "Delimited", FieldIndex = FieldIndex, Start = Start, Length = Length, JsonPath = JsonPath ?? string.Empty, Optional = Optional, Trim = Trim };
+        }
     }
 
     public sealed class ImageViewDocumentViewModel : ObservableObject
